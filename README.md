@@ -203,12 +203,6 @@ Kakadoo was developed at the Bauhaus-Universität Weimar and the City Intelligen
 }
 ```
 
-**Thesis:** Atakan, A. O. (2024) *Enhancing Community Engagement in Urban Planning through the use of Large Language
-Models*. MSc thesis, Integrated Urban Development & Design, Bauhaus-Universität Weimar. Supervisors: Jun. Prof. Dr.
-Reinhard König and Dr. Stefan Seer.
-
----
-
 ## License
 
 [MIT](LICENSE) © 2024 Alp Okan Atakan. Third-party software and models have their own licences, see
