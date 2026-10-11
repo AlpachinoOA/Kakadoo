@@ -160,7 +160,7 @@ packages `kakadoo-<version>-rh8_0-win.yak` and `-mac.yak` in `bin/Release`.
 
 Kakadoo was developed at the Bauhaus-Universität Weimar and the City Intelligence Lab (AIT).
 
-**Paper** (please cite this):
+**Paper** (for citations):
 
 > Atakan, A. O., Kostourou, F., Sandor, V., Seer, S. and Koenig, R. (2025) "Kakadoo: LLM enabled speech interface for
 > enhanced human-computer interaction", in *Confluence: Proceedings of the 43rd Conference on Education and Research in
