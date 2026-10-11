@@ -154,29 +154,6 @@ dotnet build -c Release
 The plugin is built for `net7.0-windows` and `net7.0` (Mac). If Rhino 8 is installed, the build also creates the Yak
 packages `kakadoo-<version>-rh8_0-win.yak` and `-mac.yak` in `bin/Release`.
 
-### Project structure
-
-```
-Kakadoo/
-├── README.md
-├── LICENSE
-├── THIRD_PARTY_NOTICES.txt
-├── Kakadoo.sln
-├── assets/
-│   ├── icon.png                 package icon
-│   └── logos/                   component logos (SVG)
-└── src/Kakadoo/
-    ├── Kakadoo.csproj
-    ├── KakadooInfo.cs           plugin information shown in Grasshopper
-    ├── Components/              the Grasshopper components
-    ├── Speech/                  microphone, Whisper, Vosk, backup engines, catchphrase, spoken numbers
-    ├── Llm/                     native loading for the local Llama models
-    ├── Common/                  slider handling, settings, hardware detection, icons
-    ├── UI/                      download progress bar on the canvas
-    ├── Resources/               component icons
-    └── Properties/
-```
-
 ---
 
 ## Research
