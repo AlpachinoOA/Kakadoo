@@ -1,0 +1,17 @@
+# Build output and packages
+bin/
+obj/
+*.yak
+
+# Visual Studio / editors
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Models are large and downloaded separately
+*.gguf
+ggml-*.bin
+
+# Local settings
+settings.txt

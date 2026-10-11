@@ -1,0 +1,23 @@
+Kakadoo - third-party software
+
+Kakadoo is Copyright (c) 2024 Alp Okan Atakan.
+
+This package includes the following open-source software. Each is used under its own licence.
+
+- Whisper.net and whisper.cpp (speech recognition)      MIT licence
+  https://github.com/sandrohanea/whisper.net  https://github.com/ggerganov/whisper.cpp
+- OpenAI Whisper models (downloaded on first use)       MIT licence
+  https://github.com/openai/whisper
+- LLamaSharp and llama.cpp (local language models)      MIT licence
+  https://github.com/SciSharp/LLamaSharp  https://github.com/ggerganov/llama.cpp
+- Vosk (offline speech recognition)                     Apache License 2.0
+  https://github.com/alphacep/vosk-api
+- NAudio (microphone recording on Windows)              MIT licence
+  https://github.com/naudio/NAudio
+- OpenTK (microphone recording on Mac)                  MIT licence
+  https://github.com/opentk/opentk
+- System.Speech, Microsoft.Extensions.*, System.* packages   MIT licence, (c) Microsoft
+- Newtonsoft.Json is supplied by Rhino and is not included in this package.
+
+Language models that you choose yourself (for example a Llama 2 GGUF file for Kakadoo Llama, or a Vosk
+model) are not part of this package and have their own licences, which you must follow.
