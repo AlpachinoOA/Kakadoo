@@ -1,0 +1,152 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	
+  <PropertyGroup>
+    <!-- Select the framework(s) you wish to target.
+        Rhino 6: net45
+        Rhino 7: net48
+        Rhino 8 Windows: net48, net7.0, net7.0-windows, net7.0-windows10.0.22000.0, etc
+        Rhino 8 Mac: net7.0, net7.0-macos, net7.0-macos12.0, etc
+    -->
+    <TargetFrameworks>net7.0-windows;net7.0</TargetFrameworks>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <TargetExt>.gha</TargetExt>
+    <NoWarn>NU1701;NETSDK1086;CA1416</NoWarn>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <LangVersion>latest</LangVersion>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <!-- Some NuGet packages list net8.0+ but work fine on net7.0 (Rhino 8) -->
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <!-- Specifies information for Assembly and Yak -->
+    <Version>1.0</Version>
+    <Title>Kakadoo</Title>
+    <Company>Alp Okan Atakan</Company>
+    <Copyright>Copyright (c) 2024 Alp Okan Atakan</Copyright>
+    <Description>Manipulate sliders with your voice!</Description>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="8.0.23304.9001" ExcludeAssets="runtime" />
+    <PackageReference Include="LLamaSharp" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.27.0" />
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" ExcludeAssets="runtime" />
+    <PackageReference Include="Vosk" Version="0.3.38" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\*.png" LogicalName="Kakadoo.Resources.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- OpenAL does microphone capture on Mac (built in to macOS); .NET Framework is Windows-only so it is skipped there -->
+  <ItemGroup Condition="!$(TargetFramework.StartsWith('net4'))">
+    <PackageReference Include="OpenTK.Audio.OpenAL" Version="4.8.2" />
+  </ItemGroup>
+
+  <!-- Ship Vosk's native libraries for every OS, so a plugin built on Windows also runs on Mac -->
+  <ItemGroup>
+    <None Include="$(NuGetPackageRoot)vosk/0.3.38/build/lib/osx-universal/libvosk.dylib" Link="runtimes/osx/native/libvosk.dylib" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)vosk/0.3.38/build/lib/win-x64/*.dll" Link="runtimes/win-x64/native/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\THIRD_PARTY_NOTICES.txt" Link="THIRD_PARTY_NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- System.Speech is part of .NET Framework; on .NET 7 it comes from NuGet (Windows only) -->
+  <ItemGroup Condition="!$(TargetFramework.StartsWith('net4'))">
+    <PackageReference Include="System.Speech" Version="7.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
+    <Reference Include="System.Speech" />
+  </ItemGroup>
+
+  <!-- For Windows only builds -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('-windows')) or $(TargetFramework.StartsWith('net4'))">
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <!-- Reference WinForms for .NET 7.0 on macOS -->
+  <ItemGroup Condition="!($(TargetFramework.Contains('-windows')) or $(TargetFramework.StartsWith('net4')))">
+    <!-- Rhino 8.11 and later you can use this -->
+    <!-- <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" /> -->
+    
+    <!-- Rhino 8.10 and earlier -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" ExcludeAssets="all" GeneratePathProperty="true" />
+    <Reference Include="$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net48)\build\.NETFramework\v4.8\System.Windows.Forms.dll" Private="False" />
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <!-- Keep only the native libraries for the platform each build is for (Windows x64, or Mac) -->
+  <Target Name="TrimRuntimes" AfterTargets="Build">
+    <ItemGroup>
+      <UnwantedRuntime Include="$(OutDir)runtimes/linux-x64;$(OutDir)runtimes/linux-arm64;$(OutDir)runtimes/linux-musl-x64;$(OutDir)runtimes/win-arm64;$(OutDir)runtimes/win-x86;$(OutDir)runtimes/linux-arm;$(OutDir)runtimes/win-x64/native/avx512" />
+      <UnwantedRuntime Include="$(OutDir)runtimes/osx;$(OutDir)runtimes/osx-x64;$(OutDir)runtimes/osx-arm64;$(OutDir)runtimes/macos-arm64;$(OutDir)runtimes/macos-x64" Condition="$(TargetFramework.Contains('-windows'))" />
+      <UnwantedRuntime Include="$(OutDir)runtimes/win-x64;$(OutDir)runtimes/win" Condition="!$(TargetFramework.Contains('-windows'))" />
+    </ItemGroup>
+    <RemoveDir Directories="@(UnwantedRuntime)" />
+
+    <!-- The NuGet package puts a stub that throws PlatformNotSupportedException at the top level and the real
+         Windows implementation under runtimes/win. Rhino loads the top-level one, so swap in the real one. -->
+    <Copy SourceFiles="$(OutDir)runtimes/win/lib/net7.0/System.Speech.dll" DestinationFolder="$(OutDir)" Condition="$(TargetFramework.Contains('-windows')) and Exists('$(OutDir)runtimes/win/lib/net7.0/System.Speech.dll')" />
+    <!-- Files this platform never loads -->
+    <ItemGroup>
+      <!-- Mac: Windows recording and speech, and the Windows Vosk runtime libraries -->
+      <UnusedFile Include="$(OutDir)System.Speech.dll;$(OutDir)NAudio*.dll;$(OutDir)libvosk.dll;$(OutDir)libgcc_s_seh-1.dll;$(OutDir)libstdc++-6.dll;$(OutDir)libwinpthread-1.dll" Condition="!$(TargetFramework.Contains('-windows'))" />
+      <!-- Windows: OpenAL recording is Mac only. The Vosk libraries live once, in runtimes/win-x64/native
+           (the NuGet package also copies them to the top level, which doubled their size). -->
+      <UnusedFile Include="$(OutDir)OpenTK*.dll;$(OutDir)libvosk.dll;$(OutDir)libgcc_s_seh-1.dll;$(OutDir)libstdc++-6.dll;$(OutDir)libwinpthread-1.dll" Condition="$(TargetFramework.Contains('-windows'))" />
+    </ItemGroup>
+    <Delete Files="@(UnusedFile)" />
+    <!-- the real System.Speech has been copied to the top level above, so the second copy can go -->
+    <RemoveDir Directories="$(OutDir)runtimes/win" Condition="$(TargetFramework.Contains('-windows'))" />
+  </Target>
+
+  <Target Name="BuildYakPackage" AfterTargets="DispatchToInnerBuilds">
+    <PropertyGroup>
+      <YakExecutable Condition="$(YakExecutable) == '' and $([MSBuild]::IsOSPlatform(windows)) and Exists('C:\Program Files\Rhino 8\System\Yak.exe')">C:\Program Files\Rhino 8\System\Yak.exe</YakExecutable>
+      <YakExecutable Condition="$(YakExecutable) == '' and $([MSBuild]::IsOSPlatform(macos)) and Exists('/Applications/Rhino 8.app/Contents/Resources/bin/yak')">/Applications/Rhino 8.app/Contents/Resources/bin/yak</YakExecutable>
+      
+      <BuildYakPackage Condition="$(BuildYakPackage) == '' and $(YakExecutable) != '' and Exists($(YakExecutable))">True</BuildYakPackage>
+    </PropertyGroup>
+    
+    <Warning Text="Could not find Yak executable" Condition="$(YakExecutable) == ''" />
+
+    <!-- One package per platform, so a Windows install never downloads the Mac libraries (and vice versa) -->
+    <ItemGroup>
+      <YakPackagesToDelete Include="$(OutputPath)*.yak;$(OutputPath)manifest.yml" />
+      <YakWinFiles Include="$(OutputPath)net7.0-windows/**" />
+      <YakMacFiles Include="$(OutputPath)net7.0/**" />
+    </ItemGroup>
+
+    <Delete Files="@(YakPackagesToDelete)" />
+    <RemoveDir Directories="$(OutputPath)yak-win;$(OutputPath)yak-mac" />
+
+    <Copy SourceFiles="@(YakWinFiles)" DestinationFiles="@(YakWinFiles->'$(OutputPath)yak-win/net7.0-windows/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(YakMacFiles)" DestinationFiles="@(YakMacFiles->'$(OutputPath)yak-mac/net7.0/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)/../../assets/icon.png" DestinationFolder="$(OutputPath)yak-win" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)/../../assets/icon.png" DestinationFolder="$(OutputPath)yak-mac" />
+
+    <WriteLinesToFile File="$(OutputPath)yak-win/manifest.yml" Overwrite="true" Condition="$(BuildYakPackage) == 'True'"
+                      Lines="name: kakadoo;version: 1.0.0;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
+    <Exec Command="&quot;$(YakExecutable)&quot; build --platform win" WorkingDirectory="$(OutputPath)yak-win" Condition="$(BuildYakPackage) == 'True'" />
+
+    <WriteLinesToFile File="$(OutputPath)yak-mac/manifest.yml" Overwrite="true" Condition="$(BuildYakPackage) == 'True'"
+                      Lines="name: kakadoo;version: 1.0.0;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
+    <Exec Command="&quot;$(YakExecutable)&quot; build --platform mac" WorkingDirectory="$(OutputPath)yak-mac" Condition="$(BuildYakPackage) == 'True'" />
+
+    <ItemGroup>
+      <BuiltYaks Include="$(OutputPath)yak-win/*.yak;$(OutputPath)yak-mac/*.yak" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BuiltYaks)" DestinationFolder="$(OutputPath)" />
+    <RemoveDir Directories="$(OutputPath)yak-win;$(OutputPath)yak-mac" />
+
+  </Target>
+
+</Project>
