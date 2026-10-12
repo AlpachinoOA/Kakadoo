@@ -42,10 +42,11 @@ namespace Kakadoo
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             bool run = false;
-            DA.GetData(0, ref run);
+            if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
 
             // Only trigger on the rising edge so re-solves don't relisten.
-            bool trigger = run && !lastRun;
+            bool woken = ConsumeTether(!running);
+            bool trigger = (run && !lastRun) || woken;
             lastRun = run;
 
             if (trigger && !running)
@@ -71,7 +72,7 @@ namespace Kakadoo
         {
             try
             {
-                string text = await SpeechListeners.ListenAsync(listener, m => { lock (gate) messages.Add(m); });
+                string text = await HearAsync(() => SpeechListeners.ListenAsync(listener, m => { lock (gate) messages.Add(m); }));
                 lock (gate)
                 {
                     if (string.IsNullOrWhiteSpace(text))
@@ -93,6 +94,7 @@ namespace Kakadoo
             finally
             {
                 running = false;
+                FinishTethered();
                 Rhino.RhinoApp.InvokeOnUiThread(new Action(() =>
                 {
                     Message = "Not Listening";

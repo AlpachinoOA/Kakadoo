@@ -44,10 +44,11 @@ namespace Kakadoo
             string modelPath = null;
             bool run = false;
             DA.GetData(1, ref modelPath);
-            DA.GetData(2, ref run);
+            if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
-            bool trigger = run && !lastRun;
+            bool woken = ConsumeTether(!running);
+            bool trigger = (run && !lastRun) || woken;
             lastRun = run;
 
             if (trigger && !running)
@@ -76,7 +77,7 @@ namespace Kakadoo
                 if (string.IsNullOrWhiteSpace(modelPath)) { Log("No Vosk model path provided. Connect the folder of a Vosk model."); return; }
 
                 string command;
-                try { command = await new VoskListener(modelPath).ListenOnceAsync(CancellationToken.None); }
+                try { command = await HearAsync(() => new VoskListener(modelPath).ListenOnceAsync(CancellationToken.None)); }
                 catch (Exception e) { Log(ErrorHelp.Report(this, e)); return; }
 
                 if (string.IsNullOrWhiteSpace(command)) { Log("Could not understand audio. Please try again."); return; }
@@ -99,6 +100,7 @@ namespace Kakadoo
             finally
             {
                 running = false;
+                FinishTethered();
                 Rhino.RhinoApp.InvokeOnUiThread(new Action(() =>
                 {
                     Message = "Not Listening";

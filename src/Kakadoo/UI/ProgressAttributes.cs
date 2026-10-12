@@ -126,9 +126,35 @@ namespace Kakadoo
 
         bool IsListening => Owner.Message == "Listening" || Owner.Message == "Checking";
 
+        const double PulseMs = 1600;   // the single ripple after a tethered change
+        long pulseStart;
+
+        bool PulseActive => pulseStart != 0 && Environment.TickCount64 - pulseStart < PulseMs;
+
+        /// <summary>Shows one ripple around a component, e.g. after Always-On changed something through it.</summary>
+        public static void Pulse(GH_Component owner)
+        {
+            var attributes = owner.Attributes as ProgressAttributes;
+            if (attributes == null || !(attributes.Animate && Settings.Animate)) return;
+            attributes.pulseStart = Environment.TickCount64;
+            attributes.Register();
+            Grasshopper.Instances.RedrawCanvas();
+        }
+
         void DrawListeningRing(Graphics graphics)
         {
-            if (!IsListening) { Unregister(); return; }
+            if (!IsListening)
+            {
+                if (!PulseActive) { Unregister(); return; }
+                // Not listening, but a tethered change just happened: one ripple, then nothing.
+                double pt = (Environment.TickCount64 - pulseStart) / PulseMs, pf = 1.0 - pt;
+                var old = graphics.SmoothingMode;
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                DrawRipple(graphics, (float)(1 + 20 * pt), (int)(230 * pf * pf), (float)(0.6 + 4.2 * pf * pf));
+                graphics.SmoothingMode = old;
+                Register();
+                return;
+            }
 
             bool animate = Animate && Settings.Animate;
             if (animate) Register(); else Unregister();
@@ -219,7 +245,7 @@ namespace Kakadoo
             foreach (var pair in active)
             {
                 var a = pair.Key;
-                if (!(a.Animate && Settings.Animate) || !a.IsListening || a.Owner.OnPingDocument() == null || now - pair.Value > StaleMs)
+                if (!(a.Animate && Settings.Animate) || !(a.IsListening || a.PulseActive) || a.Owner.OnPingDocument() == null || now - pair.Value > StaleMs)
                     (drop ?? (drop = new List<ProgressAttributes>())).Add(a);
                 else redraw = true;
             }

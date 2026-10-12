@@ -31,6 +31,8 @@ namespace Kakadoo
         {
         }
 
+        protected override bool SupportsTether => false;
+
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddBooleanParameter("Run", "R", "Connect a Boolean Toggle to test the microphone", GH_ParamAccess.item, false);

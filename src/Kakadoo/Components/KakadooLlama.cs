@@ -64,11 +64,13 @@ namespace Kakadoo
             string modelPath = null, device = null;
             bool run = false;
             DA.GetData(1, ref modelPath);
-            DA.GetData(2, ref run);
-            DA.GetData(3, ref device);
+            if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
+            int deviceIndex = Params.Input.FindIndex(p => p.Name == "Device");
+            if (deviceIndex >= 0) DA.GetData(deviceIndex, ref device);
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
-            bool trigger = run && !lastRun;
+            bool woken = ConsumeTether(!running);
+            bool trigger = (run && !lastRun) || woken;
             lastRun = run;
 
             if (trigger && !running)
@@ -104,7 +106,7 @@ namespace Kakadoo
 
                 string command;
                 SpeechListeners.SetHint(listener, SliderUtil.Names(sliders));
-                try { command = await SpeechListeners.ListenAsync(listener, m => Log(m)); }
+                try { command = await HearAsync(() => SpeechListeners.ListenAsync(listener, m => Log(m))); }
                 catch (Exception e) { Log("Speech error: " + ErrorHelp.Report(this, e)); return; }
 
                 if (string.IsNullOrWhiteSpace(command)) { Log("No command recognized."); return; }
@@ -132,6 +134,7 @@ namespace Kakadoo
             finally
             {
                 running = false;
+                FinishTethered();
                 if (removed) DisposeModel(); // component was deleted mid-run
                 RequestRefresh();
             }

@@ -100,6 +100,8 @@ namespace Kakadoo
                 .WithNoContext()
                 .WithTemperature(0f)
                 .WithTemperatureInc(0f)
+                // A command is short; a cap on the length stops Whisper from looping on one word ("pack pack pack ...").
+                .WithMaxTokensPerSegment(Math.Min(224, 24 + (int)(samples.Length / (double)SampleRate * 8)))
                 // Whisper always processes 30 s of audio; only look at as much as was actually recorded (50 frames per second).
                 .WithAudioContextSize(Math.Min(1500, Math.Max(256, (int)(samples.Length / (double)SampleRate * 50) + 64)));
             if (!string.IsNullOrWhiteSpace(Hint))
@@ -125,6 +127,9 @@ namespace Kakadoo
         {
             string cleaned = Regex.Replace(raw, @"\[[^\]]*\]|\([^)]*\)|\*[^*]*\*", " ");
             cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim();
+
+            // Whisper sometimes loops on a word or short phrase ("pack pack pack ..."); keep it once.
+            cleaned = Regex.Replace(cleaned, @"(?<![\w'])(\w[\w']*(?:\s+\w[\w']*){0,3}?)(?:[\s,.!?]+\1(?![\w'])){2,}", "$1", RegexOptions.IgnoreCase);
 
             // Small models sometimes repeat a short phrase; keep each sentence once, in order.
             var kept = new List<string>();

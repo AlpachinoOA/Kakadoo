@@ -18,7 +18,7 @@ namespace Kakadoo
     public class KakadooAlwaysOn : GH_Component, IGH_VariableParameterComponent
     {
         const string DefaultCatchphrase = "hey kakadoo";
-        const int MaxInfoLines = 8;
+        const int MaxInfoLines = 1; // Info shows only the latest message, at index 0
 
         readonly ISpeechListener listener = SpeechListeners.Create();
         readonly List<string> info = new List<string>(); // newest first
@@ -57,7 +57,7 @@ namespace Kakadoo
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddTextParameter("Info", "Info", "What the component heard and is doing, newest first", GH_ParamAccess.list);
+            pManager.AddTextParameter("Status", "Status", "The latest thing the component heard or did", GH_ParamAccess.list);
             pManager.AddTextParameter("Text", "Text", "The last phrase said after the catchphrase", GH_ParamAccess.item);
         }
 
@@ -73,6 +73,7 @@ namespace Kakadoo
         void SetTrigger(bool on)
         {
             if (on == TriggerOn) return;
+            if (on) SetTether(false); // trigger words and the tether wire are two different ways of working
             TriggerOn = on;
             if (on)
             {
@@ -99,6 +100,42 @@ namespace Kakadoo
                 triggered = false;
                 inputTriggers = null;
             }
+        }
+
+        /// <summary>Whether the Tether output is shown. While it is, the Trigger input and Hit output are not.</summary>
+        public bool TetherOn { get; private set; }
+
+        void SetTether(bool on)
+        {
+            if (on == TetherOn) return;
+            if (on) SetTrigger(false);
+            TetherOn = on;
+            if (on) Params.RegisterOutputParam(new TetherParam());
+            else
+            {
+                var tether = Params.Output.OfType<TetherParam>().FirstOrDefault();
+                if (tether != null) Params.UnregisterOutputParameter(tether);
+            }
+        }
+
+        /// <summary>Hands the sentence to every Kakadoo component wired to the Tether output. Runs on the UI thread; the listening thread never waits for it.</summary>
+        void Dispatch(string text)
+        {
+            if (!TetherOn) return;
+            Rhino.RhinoApp.InvokeOnUiThread(new Action(() =>
+            {
+                var tether = Params.Output.OfType<TetherParam>().FirstOrDefault();
+                if (tether == null) return;
+                int sent = 0;
+                foreach (var recipient in tether.Recipients)
+                {
+                    var target = recipient.Attributes?.GetTopLevel?.DocObject as KakadooComponent;
+                    if (target != null && target.Tether(text)) sent++;
+                }
+                Info(sent == 0
+                    ? "Nothing is wired to Tether yet. Connect it to a Kakadoo component's Tether input."
+                    : "Sent to " + sent + (sent == 1 ? " component: " : " components: ") + text);
+            }));
         }
 
         bool IGH_VariableParameterComponent.CanInsertParameter(GH_ParameterSide side, int index) => false;
@@ -263,6 +300,7 @@ namespace Kakadoo
         {
             lock (gate) recText = command;
             Info("Command: " + command);
+            Dispatch(command);
         }
 
         readonly RefreshGate refreshGate = new RefreshGate();
@@ -299,12 +337,21 @@ namespace Kakadoo
             base.AppendAdditionalComponentMenuItems(menu);
             Menu_AppendSeparator(menu);
             Menu_AppendItem(menu, "Catchphrase (blank = output everything you say):", null, false);
+            Menu_AppendTextItem(menu, Catchphrase ?? "", null, (box, text) => Catchphrase = text, true);
+            Menu_AppendSeparator(menu);
+            if (!TetherOn)
             Menu_AppendItem(menu, "Trigger", (s, e) =>
             {
                 SetTrigger(!TriggerOn);
                 Params.OnParametersChanged();
                 ExpireSolution(true);
             }, true, TriggerOn);
+            Menu_AppendItem(menu, "Tether (start other Kakadoo components by voice)", (s, e) =>
+            {
+                SetTether(!TetherOn);
+                Params.OnParametersChanged();
+                ExpireSolution(true);
+            }, true, TetherOn);
             if (TriggerOn)
             {
                 Menu_AppendItem(menu, "Trigger seconds (how long Hit stays true):", null, false);
@@ -322,6 +369,7 @@ namespace Kakadoo
         {
             writer.SetString("Catchphrase", Catchphrase ?? "");
             writer.SetBoolean("TriggerOn", TriggerOn);
+            writer.SetBoolean("TetherOn", TetherOn);
             writer.SetDouble("TriggerSeconds", TriggerSeconds);
             ProgressAttributes.Write(this, writer);
             return base.Write(writer);
@@ -336,6 +384,8 @@ namespace Kakadoo
             double seconds = 5;
             if (reader.TryGetDouble("TriggerSeconds", ref seconds)) TriggerSeconds = Math.Max(0.1, Math.Min(600, seconds));
             if (reader.TryGetBoolean("TriggerOn", ref on) && on) SetTrigger(true);
+            bool tether = false;
+            if (reader.TryGetBoolean("TetherOn", ref tether) && tether) SetTether(true);
             ProgressAttributes.Read(this, reader);
             return base.Read(reader);
         }
