@@ -30,43 +30,64 @@ namespace Kakadoo
         // Values set by a Kakadoo Settings component apply for this Rhino session only; "remember" copies them into the file.
         static string sessionMicrophone, sessionModel;
         static bool? sessionAnimate;
-        static double? sessionHold;
 
         /// <summary>Name of the microphone to use. Empty means the system default.</summary>
         public static string Microphone => sessionMicrophone ?? Get("microphone") ?? "";
 
-        /// <summary>"auto", "fast" (base.en) or "accurate" (small.en).</summary>
+        static string sessionPreset;
+
+        static string Normalize(string v, params string[] allowed)
+        {
+            v = (v ?? "").Trim().ToLowerInvariant();
+            return Array.IndexOf(allowed, v) >= 0 ? v : allowed[0];
+        }
+
+        /// <summary>The model chosen on purpose: "auto", "fast" (base.en) or "accurate" (small.en).</summary>
+        static string ChosenModel => Normalize(sessionModel ?? Get("modelPreset"), "auto", "fast", "accurate");
+
+        /// <summary>
+        /// A bundle of listening settings: "standard", "quiet" (quiet room, more sensitive), "noisy" (workshop, needs a louder voice),
+        /// "fast" (quick replies, smaller model) or "accurate" (waits longer, bigger model).
+        /// </summary>
+        public static string Preset => Normalize(sessionPreset ?? Get("preset"), "standard", "quiet", "noisy", "fast", "accurate");
+
+        /// <summary>How much louder than the room a voice must be to count as speech.</summary>
+        public static double NoiseFactor => Preset == "quiet" ? 2.5 : Preset == "noisy" ? 5.5 : 3.5;
+
+        /// <summary>How long a pause ends a phrase, in milliseconds.</summary>
+        public static int EndSilenceMs => Preset == "fast" ? 450 : Preset == "quiet" ? 600 : Preset == "noisy" ? 800 : Preset == "accurate" ? 900 : 700;
+
+        /// <summary>"auto", "fast" (base.en) or "accurate" (small.en): the chosen model, otherwise the one the preset implies.</summary>
         public static string ModelPreset
         {
             get
             {
-                string v = (sessionModel ?? Get("modelPreset") ?? "auto").Trim().ToLowerInvariant();
-                return v == "fast" || v == "accurate" ? v : "auto";
+                string chosen = ChosenModel;
+                if (chosen != "auto") return chosen;
+                return Preset == "fast" ? "fast" : Preset == "accurate" ? "accurate" : "auto";
             }
         }
 
         /// <summary>Whether the listening ripple animates. A component can still switch it off for itself.</summary>
         public static bool Animate => sessionAnimate ?? Get("animate") != "false";
 
-        /// <summary>How long (seconds) the Always-On trigger output stays true after a trigger word is heard.</summary>
-        public static double TriggerHold => sessionHold ?? (double.TryParse(Get("triggerHold"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double h) ? h : 5.0);
 
         /// <summary>Applies values for this session; null leaves a value as it is. With <paramref name="remember"/> they also become the PC defaults.</summary>
-        public static void Apply(string microphone, string model, bool? animate, double? hold, bool remember)
+        public static void Apply(string microphone, string model, bool? animate, string preset, bool remember)
         {
             bool changed = false;
             if (microphone != null && microphone.Trim() != Microphone) { sessionMicrophone = microphone.Trim(); changed = true; }
-            if (model != null && model.Trim().ToLowerInvariant() != ModelPreset) { sessionModel = model.Trim().ToLowerInvariant(); changed = true; }
+            if (model != null && Normalize(model, "auto", "fast", "accurate") != ChosenModel) { sessionModel = Normalize(model, "auto", "fast", "accurate"); changed = true; }
+            if (preset != null && Normalize(preset, "standard", "quiet", "noisy", "fast", "accurate") != Preset) { sessionPreset = Normalize(preset, "standard", "quiet", "noisy", "fast", "accurate"); changed = true; }
             if (animate.HasValue && animate.Value != Animate) { sessionAnimate = animate; changed = true; }
-            if (hold.HasValue && Math.Abs(hold.Value - TriggerHold) > 1e-9) { sessionHold = Math.Max(0.1, Math.Min(600, hold.Value)); changed = true; }
             if (changed) lock (Gate) Version++;
 
             if (remember)
             {
                 Set("microphone", Microphone);
-                Set("modelPreset", ModelPreset);
+                Set("modelPreset", ChosenModel);
+                Set("preset", Preset);
                 Set("animate", Animate ? "" : "false");
-                Set("triggerHold", TriggerHold.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
         }
 

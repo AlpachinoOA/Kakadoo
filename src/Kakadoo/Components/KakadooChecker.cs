@@ -262,7 +262,7 @@ namespace Kakadoo
         void Log(string message)
         {
             lock (gate) messages.Add(message);
-            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => ExpireSolution(true)));
+            RequestRefresh();
         }
 
         public override GH_Exposure Exposure => GH_Exposure.primary;

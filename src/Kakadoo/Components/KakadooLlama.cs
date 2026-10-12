@@ -105,7 +105,7 @@ namespace Kakadoo
                 string command;
                 SpeechListeners.SetHint(listener, SliderUtil.Names(sliders));
                 try { command = await SpeechListeners.ListenAsync(listener, m => Log(m)); }
-                catch (Exception e) { Log("Speech error: " + e.Message); return; }
+                catch (Exception e) { Log("Speech error: " + ErrorHelp.Report(this, e)); return; }
 
                 if (string.IsNullOrWhiteSpace(command)) { Log("No command recognized."); return; }
                 command = command.ToLowerInvariant();
@@ -127,13 +127,13 @@ namespace Kakadoo
             }
             catch (Exception e)
             {
-                Log("An error occurred: " + e.Message);
+                Log("An error occurred: " + ErrorHelp.Report(this, e));
             }
             finally
             {
                 running = false;
                 if (removed) DisposeModel(); // component was deleted mid-run
-                Rhino.RhinoApp.InvokeOnUiThread(new Action(() => ExpireSolution(true)));
+                RequestRefresh();
             }
         }
 
@@ -208,7 +208,7 @@ namespace Kakadoo
             }
             catch (Exception e)
             {
-                Log("Could not load the model: " + e.Message + (e is DllNotFoundException || e is TypeInitializationException ? " (the llama.cpp libraries could not be loaded; reinstall the Kakadoo package and make sure the Microsoft Visual C++ Redistributable is installed)" : ""));
+                Log("Could not load the model: " + ErrorHelp.Report(this, e) + (e is DllNotFoundException || e is TypeInitializationException ? " (the llama.cpp libraries could not be loaded; reinstall the Kakadoo package and make sure the Microsoft Visual C++ Redistributable is installed)" : ""));
                 return false;
             }
         }
@@ -295,7 +295,7 @@ namespace Kakadoo
                 messages.Add(message);
             }
             if (running)
-                Rhino.RhinoApp.InvokeOnUiThread(new Action(() => ExpireSolution(true)));
+                RequestRefresh();
         }
 
         protected override void AppendAdditionalComponentMenuItems(System.Windows.Forms.ToolStripDropDown menu)

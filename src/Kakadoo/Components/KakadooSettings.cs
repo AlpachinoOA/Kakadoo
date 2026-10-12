@@ -7,7 +7,7 @@ using Grasshopper.Kernel;
 namespace Kakadoo
 {
     /// <summary>
-    /// Kakadoo Settings: one place for the settings every Kakadoo component shares (microphone, speech model, animation, trigger hold time).
+    /// Kakadoo Settings: one place for the settings every Kakadoo component shares (microphone, speech model, animation).
     /// Optional; without it the defaults saved on this PC are used. Values apply for the session, and "remember" saves them as the PC defaults.
     /// </summary>
     public class KakadooSettings : GH_Component
@@ -23,8 +23,8 @@ namespace Kakadoo
         {
             pManager.AddTextParameter("Microphone", "Mic", "Microphone to listen with: its name or its number in the Microphones output (0 = first). Empty = system default", GH_ParamAccess.item);
             pManager.AddTextParameter("Model", "Model", "Speech model: \"auto\", \"fast\" (smaller, quicker) or \"accurate\" (bigger, more precise)", GH_ParamAccess.item);
+            pManager.AddTextParameter("Preset", "Preset", "A bundle of listening settings: \"standard\", \"quiet\" (quiet room, more sensitive), \"noisy\" (workshop, needs a louder voice), \"fast\" (quick replies, smaller model) or \"accurate\" (waits longer, bigger model). Model, if set, overrides the preset's model.", GH_ParamAccess.item);
             pManager.AddBooleanParameter("Animation", "Anim", "Show the red listening animation", GH_ParamAccess.item);
-            pManager.AddNumberParameter("Hold", "Hold", "Seconds the Always-On trigger output stays true after a trigger word is heard (default 5)", GH_ParamAccess.item);
             pManager.AddBooleanParameter("Remember", "Save", "True = also keep these values as the defaults on this PC", GH_ParamAccess.item, false);
             foreach (var p in Params.Input) p.Optional = true;
         }
@@ -49,9 +49,9 @@ namespace Kakadoo
             bool animation = true, remember = false;
             bool hasMic = Params.Input[0].SourceCount > 0 && DA.GetData(0, ref mic);
             bool hasModel = Params.Input[1].SourceCount > 0 && DA.GetData(1, ref model);
-            bool hasAnim = Params.Input[2].SourceCount > 0 && DA.GetData(2, ref animation);
-            double hold = 5;
-            bool hasHold = Params.Input[3].SourceCount > 0 && DA.GetData(3, ref hold);
+            string preset = null;
+            bool hasPreset = Params.Input[2].SourceCount > 0 && DA.GetData(2, ref preset);
+            bool hasAnim = Params.Input[3].SourceCount > 0 && DA.GetData(3, ref animation);
             DA.GetData(4, ref remember);
 
             if (hasModel && !new[] { "auto", "fast", "accurate" }.Contains((model ?? "").Trim().ToLowerInvariant()))
@@ -64,7 +64,13 @@ namespace Kakadoo
             // A plain number picks that microphone from the list (0 = first), which is quicker than typing its name.
             if (hasMic && int.TryParse((mic ?? "").Trim(), out int index) && index >= 0 && index < devices.Length) mic = devices[index];
 
-            Settings.Apply(hasMic ? mic : null, hasModel ? model : null, hasAnim ? animation : (bool?)null, hasHold ? hold : (double?)null, remember);
+            if (hasPreset && !new[] { "standard", "quiet", "noisy", "fast", "accurate" }.Contains((preset ?? "").Trim().ToLowerInvariant()))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Preset must be standard, quiet, noisy, fast or accurate.");
+                hasPreset = false;
+            }
+
+            Settings.Apply(hasMic ? mic : null, hasModel ? model : null, hasAnim ? animation : (bool?)null, hasPreset ? preset : null, remember);
 
             if (hasMic && !string.IsNullOrWhiteSpace(mic) &&
                 !devices.Any(d => mic.StartsWith(d, StringComparison.OrdinalIgnoreCase) || d.StartsWith(mic, StringComparison.OrdinalIgnoreCase)))
@@ -72,9 +78,9 @@ namespace Kakadoo
 
             DA.SetDataList(0, devices);
             DA.SetData(1, "Microphone: " + (string.IsNullOrEmpty(Settings.Microphone) ? "system default" : Settings.Microphone)
+                + " | Preset: " + Settings.Preset
                 + " | Model: " + Settings.ModelPreset
-                + " | Animation: " + (Settings.Animate ? "on" : "off")
-                + " | Trigger hold: " + Settings.TriggerHold.ToString("0.#") + " s");
+                + " | Animation: " + (Settings.Animate ? "on" : "off"));
         }
 
         public override GH_Exposure Exposure => GH_Exposure.primary;

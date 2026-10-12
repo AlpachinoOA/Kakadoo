@@ -9,6 +9,7 @@ namespace Kakadoo
         static readonly Stopwatch Throttle = new Stopwatch();
 
         public static volatile bool Active;
+        public static long StartedAt { get; private set; }
         public static volatile string Title = "";
         public static volatile string Folder = "";
         public static double Fraction { get; private set; }
@@ -24,6 +25,7 @@ namespace Kakadoo
             Folder = folder;
             Fraction = 0;
             DoneBytes = TotalBytes = 0;
+            StartedAt = Environment.TickCount64;
             Active = true;
             Throttle.Restart();
             Changed?.Invoke();

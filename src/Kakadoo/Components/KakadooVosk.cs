@@ -77,7 +77,7 @@ namespace Kakadoo
 
                 string command;
                 try { command = await new VoskListener(modelPath).ListenOnceAsync(CancellationToken.None); }
-                catch (Exception e) { Log(e.Message); return; }
+                catch (Exception e) { Log(ErrorHelp.Report(this, e)); return; }
 
                 if (string.IsNullOrWhiteSpace(command)) { Log("Could not understand audio. Please try again."); return; }
                 command = command.ToLowerInvariant();
@@ -94,7 +94,7 @@ namespace Kakadoo
             }
             catch (Exception e)
             {
-                Log("An error occurred: " + e.Message);
+                Log("An error occurred: " + ErrorHelp.Report(this, e));
             }
             finally
             {
@@ -114,7 +114,7 @@ namespace Kakadoo
                 if (clear) messages.Clear();
                 messages.Add(message);
             }
-            Rhino.RhinoApp.InvokeOnUiThread(new Action(() => ExpireSolution(true)));
+            RequestRefresh();
         }
 
         protected override Bitmap Icon => Icons.Load("KakadooVosk");

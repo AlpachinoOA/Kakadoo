@@ -15,7 +15,7 @@ namespace Kakadoo
     /// Kakadoo Always-On: keeps listening while Run is true. When it hears the catchphrase (like "hey kakadoo"),
     /// the phrase that follows is output as text. The catchphrase is set in the right-click menu.
     /// </summary>
-    public class KakadooAlwaysOn : GH_Component
+    public class KakadooAlwaysOn : GH_Component, IGH_VariableParameterComponent
     {
         const string DefaultCatchphrase = "hey kakadoo";
         const int MaxInfoLines = 8;
@@ -27,20 +27,17 @@ namespace Kakadoo
         string recText = string.Empty;
         volatile string modelPath;
 
-        // Trigger words: heard anywhere in a sentence -> the "trigger" output is true for the hold time.
+        // Trigger words: heard anywhere in a sentence -> the Hit output is true for the trigger seconds.
         // Only a volatile flag and a timer are touched from the listening thread; the canvas is refreshed through the UI queue.
         volatile bool triggered;
         long triggerUntil; // Environment.TickCount64 when the output goes back to false
         System.Threading.Timer triggerTimer;
-        volatile string inputTriggers; // from the Triggers input; null when nothing is wired
+        volatile string inputTriggers; // from the Trigger input; null when nothing is wired
         string triggerKey;
         System.Text.RegularExpressions.Regex triggerRegex;
 
         /// <summary>What you say to wake the component. Blank means every phrase is output.</summary>
         public string Catchphrase { get; set; } = DefaultCatchphrase;
-
-        /// <summary>Words or phrases, separated by commas. Hearing any of them in a sentence sets the trigger output to true for a while.</summary>
-        public string TriggerWords { get; set; } = "";
 
         public KakadooAlwaysOn()
           : base("Kakadoo Always-On", "KkAO",
@@ -53,19 +50,62 @@ namespace Kakadoo
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
-            pManager.AddBooleanParameter("run", "run", "Activate this to keep listening", GH_ParamAccess.item, false);
-            pManager.AddTextParameter("Model Path", "M", "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.", GH_ParamAccess.item);
+            pManager.AddBooleanParameter("Run", "Run", "Activate this to keep listening", GH_ParamAccess.item, false);
+            pManager.AddTextParameter("Model Path", "Model Path", "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.", GH_ParamAccess.item);
             pManager[1].Optional = true;
-            pManager.AddTextParameter("Triggers", "T", "Optional: trigger words (a list). Hearing any of them in a sentence makes the trigger output true for a few seconds. Overrides the right-click setting.", GH_ParamAccess.list);
-            pManager[2].Optional = true;
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.AddTextParameter("info", "info", "What the component heard and is doing, newest first", GH_ParamAccess.list);
-            pManager.AddTextParameter("text", "text", "The last phrase said after the catchphrase", GH_ParamAccess.item);
-            pManager.AddBooleanParameter("trigger", "trigger", "True for a few seconds after one of the trigger words is heard (set in the right-click menu)", GH_ParamAccess.item);
+            pManager.AddTextParameter("Info", "Info", "What the component heard and is doing, newest first", GH_ParamAccess.list);
+            pManager.AddTextParameter("Text", "Text", "The last phrase said after the catchphrase", GH_ParamAccess.item);
         }
+
+        // The trigger input and output only exist while "Trigger" is ticked in the right-click menu.
+        const int TriggerInput = 2, HitOutput = 2;
+
+        /// <summary>Whether the Trigger input and Hit output are shown.</summary>
+        public bool TriggerOn { get; private set; }
+
+        /// <summary>How long Hit stays true after a trigger word is heard.</summary>
+        public double TriggerSeconds { get; set; } = 5;
+
+        void SetTrigger(bool on)
+        {
+            if (on == TriggerOn) return;
+            TriggerOn = on;
+            if (on)
+            {
+                Params.RegisterInputParam(new Grasshopper.Kernel.Parameters.Param_String
+                {
+                    Name = "Trigger",
+                    NickName = "Trigger",
+                    Description = "Words or phrases to listen for (a list). Hearing any of them in a sentence makes Hit true for the trigger seconds.",
+                    Access = GH_ParamAccess.list,
+                    Optional = true
+                });
+                Params.RegisterOutputParam(new Grasshopper.Kernel.Parameters.Param_Boolean
+                {
+                    Name = "Hit",
+                    NickName = "Hit",
+                    Description = "True for a few seconds after one of the trigger words is heard"
+                });
+            }
+            else
+            {
+                if (Params.Input.Count > TriggerInput) Params.UnregisterInputParameter(Params.Input[TriggerInput]);
+                if (Params.Output.Count > HitOutput) Params.UnregisterOutputParameter(Params.Output[HitOutput]);
+                lock (gate) { triggerTimer?.Dispose(); triggerTimer = null; }
+                triggered = false;
+                inputTriggers = null;
+            }
+        }
+
+        bool IGH_VariableParameterComponent.CanInsertParameter(GH_ParameterSide side, int index) => false;
+        bool IGH_VariableParameterComponent.CanRemoveParameter(GH_ParameterSide side, int index) => false;
+        IGH_Param IGH_VariableParameterComponent.CreateParameter(GH_ParameterSide side, int index) => null;
+        bool IGH_VariableParameterComponent.DestroyParameter(GH_ParameterSide side, int index) => false;
+        void IGH_VariableParameterComponent.VariableParameterMaintenance() { }
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
@@ -74,8 +114,12 @@ namespace Kakadoo
             DA.GetData(0, ref run);
             DA.GetData(1, ref modelPath);
             this.modelPath = modelPath;
-            var wired = new List<string>();
-            inputTriggers = Params.Input[2].SourceCount > 0 && DA.GetDataList(2, wired) ? string.Join(",", wired) : null;
+            inputTriggers = null;
+            if (TriggerOn)
+            {
+                var wired = new List<string>();
+                if (Params.Input[TriggerInput].SourceCount > 0 && DA.GetDataList(TriggerInput, wired)) inputTriggers = string.Join(",", wired);
+            }
 
             if (run && cts == null)
             {
@@ -102,7 +146,7 @@ namespace Kakadoo
             {
                 DA.SetDataList(0, info.ToList());
                 DA.SetData(1, recText);
-                DA.SetData(2, triggered);
+                if (TriggerOn) DA.SetData(HitOutput, triggered);
             }
         }
 
@@ -156,7 +200,7 @@ namespace Kakadoo
                 catch (Exception e)
                 {
                     // Stop on errors (no microphone, no speech engine) instead of retrying forever.
-                    Info("Stopped: " + e.Message, refresh: false);
+                    Info("Stopped: " + ErrorHelp.Report(this, e), refresh: false);
                     Rhino.RhinoApp.InvokeOnUiThread(new Action(() =>
                     {
                         Stop();
@@ -170,10 +214,11 @@ namespace Kakadoo
 
         void CheckTriggers(string heard)
         {
+            if (!TriggerOn) return;
             var regex = TriggerRegex();
             if (regex == null || !regex.IsMatch(heard)) return;
 
-            long hold = (long)(Settings.TriggerHold * 1000);
+            long hold = (long)(Math.Max(0.1, TriggerSeconds) * 1000);
             Interlocked.Exchange(ref triggerUntil, Environment.TickCount64 + hold);
             bool wasOn = triggered;
             triggered = true;
@@ -201,7 +246,7 @@ namespace Kakadoo
         /// <summary>Whole-word, case-insensitive match for the comma-separated trigger words; rebuilt only when the words change.</summary>
         System.Text.RegularExpressions.Regex TriggerRegex()
         {
-            string words = inputTriggers ?? TriggerWords ?? "";
+            string words = inputTriggers ?? "";
             if (words == triggerKey) return triggerRegex;
             triggerKey = words;
             var parts = words.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)
@@ -220,21 +265,9 @@ namespace Kakadoo
             Info("Command: " + command);
         }
 
-        int refreshPending;
+        readonly RefreshGate refreshGate = new RefreshGate();
 
-        /// <summary>
-        /// Asks for a recompute from any thread. Repeated requests are merged, and the update is scheduled with the document, so it waits
-        /// for a running solution instead of interrupting it (important in big definitions).
-        /// </summary>
-        void RequestRefresh()
-        {
-            if (Interlocked.Exchange(ref refreshPending, 1) == 1) return;
-            Rhino.RhinoApp.InvokeOnUiThread(new Action(() =>
-            {
-                Interlocked.Exchange(ref refreshPending, 0);
-                OnPingDocument()?.ScheduleSolution(5, d => ExpireSolution(false));
-            }));
-        }
+        void RequestRefresh() => UiRefresh.Request(this, refreshGate);
 
         void Info(string message, bool refresh = true)
         {
@@ -266,16 +299,30 @@ namespace Kakadoo
             base.AppendAdditionalComponentMenuItems(menu);
             Menu_AppendSeparator(menu);
             Menu_AppendItem(menu, "Catchphrase (blank = output everything you say):", null, false);
-            Menu_AppendTextItem(menu, Catchphrase ?? "", null, (box, text) => Catchphrase = text, true);
-            Menu_AppendItem(menu, "Trigger words (comma separated; true for a few seconds when heard):", null, false);
-            Menu_AppendTextItem(menu, TriggerWords ?? "", null, (box, text) => TriggerWords = text, true);
+            Menu_AppendItem(menu, "Trigger", (s, e) =>
+            {
+                SetTrigger(!TriggerOn);
+                Params.OnParametersChanged();
+                ExpireSolution(true);
+            }, true, TriggerOn);
+            if (TriggerOn)
+            {
+                Menu_AppendItem(menu, "Trigger seconds (how long Hit stays true):", null, false);
+                Menu_AppendTextItem(menu, TriggerSeconds.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), null, (box, text) =>
+                {
+                    if (double.TryParse((text ?? "").Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double seconds)
+                        && seconds >= 0.1 && seconds <= 600)
+                        TriggerSeconds = seconds;
+                }, true);
+            }
             ProgressAttributes.AppendMenu(menu, this);
         }
 
         public override bool Write(GH_IWriter writer)
         {
             writer.SetString("Catchphrase", Catchphrase ?? "");
-            writer.SetString("TriggerWords", TriggerWords ?? "");
+            writer.SetBoolean("TriggerOn", TriggerOn);
+            writer.SetDouble("TriggerSeconds", TriggerSeconds);
             ProgressAttributes.Write(this, writer);
             return base.Write(writer);
         }
@@ -284,8 +331,11 @@ namespace Kakadoo
         {
             string phrase = null;
             if (reader.TryGetString("Catchphrase", ref phrase)) Catchphrase = phrase;
-            string triggers = null;
-            if (reader.TryGetString("TriggerWords", ref triggers)) TriggerWords = triggers;
+            // The trigger parameters are created before the base class reads the saved parameters, so the counts match.
+            bool on = false;
+            double seconds = 5;
+            if (reader.TryGetDouble("TriggerSeconds", ref seconds)) TriggerSeconds = Math.Max(0.1, Math.Min(600, seconds));
+            if (reader.TryGetBoolean("TriggerOn", ref on) && on) SetTrigger(true);
             ProgressAttributes.Read(this, reader);
             return base.Read(reader);
         }

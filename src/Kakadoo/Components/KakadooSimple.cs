@@ -88,7 +88,7 @@ namespace Kakadoo
             }
             catch (Exception e)
             {
-                lock (gate) messages.Add("Speech error: " + e.Message);
+                lock (gate) messages.Add("Speech error: " + ErrorHelp.Report(this, e));
             }
             finally
             {

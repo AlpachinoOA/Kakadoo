@@ -54,7 +54,7 @@ namespace Kakadoo
                     return true;
                 }
 
-                double threshold = Math.Max(0.01, noise * 3.5);
+                double threshold = Math.Max(0.01, noise * Settings.NoiseFactor);
 
                 if (!speaking)
                 {
@@ -80,8 +80,8 @@ namespace Kakadoo
                 quietChunks = level > threshold * 0.7 ? 0 : quietChunks + 1;
                 if (quietChunks == 0) lastLoud = phrase.Length;
 
-                // About 0.7 s of quiet ends the phrase.
-                if (quietChunks * ChunkMs >= 700) return false;
+                // A pause of the preset length (0.7 s by default) ends the phrase.
+                if (quietChunks * ChunkMs >= Settings.EndSilenceMs) return false;
                 return DateTime.UtcNow - speechStart < maxLength;
             });
 
@@ -137,7 +137,7 @@ namespace Kakadoo
             {
                 if (Environment.OSVersion.Platform == PlatformID.Win32NT) return WindowsDevices();
 #if !NETFRAMEWORK
-                return OpenTK.Audio.OpenAL.ALC.GetStringList(OpenTK.Audio.OpenAL.GetEnumerationStringList.CaptureDeviceSpecifier).ToArray();
+                return OpenALDevices();
 #endif
             }
             catch (Exception)
@@ -146,6 +146,13 @@ namespace Kakadoo
             }
             return new string[0];
         }
+
+#if !NETFRAMEWORK
+        // Kept in its own method so OpenTK is only loaded on Mac; the Windows build doesn't ship it.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static string[] OpenALDevices() =>
+            OpenTK.Audio.OpenAL.ALC.GetStringList(OpenTK.Audio.OpenAL.GetEnumerationStringList.CaptureDeviceSpecifier).ToArray();
+#endif
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static string[] WindowsDevices()
@@ -178,8 +185,31 @@ namespace Kakadoo
         }
 #endif
 
-        /// <summary>Streams ~50 ms chunks of audio to <paramref name="onChunk"/> until it returns false or the token is cancelled.</summary>
+        /// <summary>How loud the microphone is right now, 0 to 1 (smoothed). Drives the strength of the listening ripple.</summary>
+        public static volatile float Level;
+
+        /// <summary>
+        /// Streams ~50 ms chunks to <paramref name="onChunk"/> until it returns false or the token is cancelled. Also tracks the loudness
+        /// and stops early when another microphone is chosen in the settings, so the change applies at once.
+        /// </summary>
         static void Capture(int sampleRate, CancellationToken token, Func<byte[], bool> onChunk)
+        {
+            string mic = Settings.Microphone;
+            try
+            {
+                CaptureRaw(sampleRate, token, chunk =>
+                {
+                    Level = (float)Math.Max(Rms(chunk), Level * 0.85);
+                    return onChunk(chunk) && Settings.Microphone == mic;
+                });
+            }
+            finally
+            {
+                Level = 0;
+            }
+        }
+
+        static void CaptureRaw(int sampleRate, CancellationToken token, Func<byte[], bool> onChunk)
         {
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {

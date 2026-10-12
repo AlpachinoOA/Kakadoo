@@ -65,6 +65,10 @@ namespace Kakadoo
     public abstract class KakadooComponent : GH_Component
     {
         protected readonly MessageLog messages = new MessageLog();
+        readonly RefreshGate refreshGate = new RefreshGate();
+
+        /// <summary>Recomputes this component from any thread, safely and merged (see <see cref="UiRefresh"/>).</summary>
+        protected void RequestRefresh() => UiRefresh.Request(this, refreshGate);
 
         protected KakadooComponent(string name, string nickname, string description, string category, string subCategory)
           : base(name, nickname, description, category, subCategory)
