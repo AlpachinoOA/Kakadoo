@@ -87,6 +87,7 @@ namespace Kakadoo
                 }
             }, true);
 
+            ProgressAttributes.AppendMenu(menu, this);
             if (UsesWhisper) AppendWhisperMenu(menu);
         }
 
@@ -104,6 +105,7 @@ namespace Kakadoo
         public override bool Write(GH_IWriter writer)
         {
             writer.SetInt32("HistoryLimit", messages.Limit);
+            ProgressAttributes.Write(this, writer);
             return base.Write(writer);
         }
 
@@ -111,6 +113,7 @@ namespace Kakadoo
         {
             int limit = 4;
             if (reader.TryGetInt32("HistoryLimit", ref limit)) messages.Limit = Math.Max(1, limit);
+            ProgressAttributes.Read(this, reader);
             return base.Read(reader);
         }
     }

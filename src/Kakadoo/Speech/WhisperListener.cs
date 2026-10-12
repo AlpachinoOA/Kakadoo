@@ -63,14 +63,17 @@ namespace Kakadoo
             try
             {
                 modelFile = WhisperModel.EnsureAvailable(ModelPath); // downloads once if there is no local model
-                GetFactory(modelFile);
             }
             catch (Exception e) when (!(e is SpeechSetupException))
             {
                 throw new SpeechSetupException(Friendly(e), e);
             }
 
+            // Load the engine while the microphone listens, so the first phrase isn't delayed by the load.
+            var loading = Task.Run(() => GetFactory(modelFile));
             byte[] pcm = await Task.Run(() => Microphone.RecordPhrase(SampleRate, TimeSpan.FromSeconds(6), TimeSpan.FromSeconds(15), token), token);
+            try { await loading; }
+            catch (Exception e) when (!(e is SpeechSetupException)) { throw new SpeechSetupException(Friendly(e), e); }
             if (pcm.Length < SampleRate * 2 * 0.4) return null; // nothing said, or just a click
 
             return await TranscribeAsync(modelFile, pcm, token);
@@ -112,6 +115,11 @@ namespace Kakadoo
             return Clean(text.ToString());
         }
 
+        static readonly HashSet<string> Hallucinations = new HashSet<string>
+        {
+            "you", "thank you", "thanks", "thank you for watching", "thanks for watching", "bye", "the end"
+        };
+
         /// <summary>Removes Whisper's non-speech markers like [BLANK_AUDIO] or (music).</summary>
         static string Clean(string raw)
         {
@@ -123,6 +131,10 @@ namespace Kakadoo
             foreach (var s in Regex.Split(cleaned, @"(?<=[.!?])\s+").Where(s => s.Length > 0))
                 if (kept.Count == 0 || !string.Equals(kept[kept.Count - 1], s, StringComparison.OrdinalIgnoreCase)) kept.Add(s);
             cleaned = string.Join(" ", kept);
+
+            // Whisper invents these on near-silent audio.
+            string plain = Regex.Replace(cleaned.ToLowerInvariant(), "[^a-z ]", "").Trim();
+            if (Hallucinations.Contains(plain)) return null;
 
             return cleaned.Length == 0 ? null : cleaned;
         }
@@ -156,7 +168,13 @@ namespace Kakadoo
         /// Otherwise "small.en" (466 MB, most accurate) on a capable PC and "base.en" (141 MB, about 3x faster) on a modest one.
         /// </summary>
         public static string Name =>
-            EnvValue is string v && !LooksLikePath(v) ? v : AutoName;
+            EnvValue is string v && !LooksLikePath(v) ? v : PresetName ?? AutoName;
+
+        /// <summary>The model chosen with the Kakadoo Settings component, or null for automatic.</summary>
+        static string PresetName => Settings.ModelPreset == "fast" ? "base.en" : Settings.ModelPreset == "accurate" ? "small.en" : null;
+
+        /// <summary>True when the user picked a specific model, so a different one must not be substituted.</summary>
+        static bool Explicit => PresetName != null;
 
         static string AutoName
         {
@@ -233,7 +251,7 @@ namespace Kakadoo
             {
                 if (!System.IO.Directory.Exists(folder)) continue;
                 string exact = Path.Combine(folder, "ggml-" + Name + ".bin");
-                string found = File.Exists(exact) ? exact : PickFrom(folder);
+                string found = File.Exists(exact) ? exact : Explicit ? null : PickFrom(folder);
                 if (found != null) { source = label; return found; }
             }
             return null;

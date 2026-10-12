@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -37,6 +38,7 @@ namespace Kakadoo
             double noise = -1;
             int calibrationChunks = 0, loudRun = 0, quietChunks = 0;
             bool speaking = false;
+            long lastLoud = 0; // where the phrase last had speech in it, so the trailing silence can be cut off
             DateTime speechStart = default;
 
             Capture(sampleRate, token, chunk =>
@@ -65,6 +67,7 @@ namespace Kakadoo
                         speaking = true;
                         speechStart = DateTime.UtcNow;
                         foreach (var c in preRoll) phrase.Write(c, 0, c.Length);
+                        lastLoud = phrase.Length;
                     }
                     else if (DateTime.UtcNow - started > waitForSpeech)
                     {
@@ -75,13 +78,20 @@ namespace Kakadoo
 
                 phrase.Write(chunk, 0, chunk.Length);
                 quietChunks = level > threshold * 0.7 ? 0 : quietChunks + 1;
+                if (quietChunks == 0) lastLoud = phrase.Length;
 
                 // About 0.7 s of quiet ends the phrase.
                 if (quietChunks * ChunkMs >= 700) return false;
                 return DateTime.UtcNow - speechStart < maxLength;
             });
 
-            return speaking ? phrase.ToArray() : new byte[0];
+            if (!speaking) return new byte[0];
+
+            // Whisper's time grows with the length of the audio, so drop the silence that ended the phrase (keep 0.2 s).
+            long keep = Math.Min(phrase.Length, lastLoud + (long)(sampleRate * 0.2) * 2);
+            var audio = phrase.ToArray();
+            if (keep < audio.Length) Array.Resize(ref audio, (int)keep);
+            return audio;
         }
 
         /// <summary>Loudness of 16-bit PCM audio, 0 to 1.</summary>
@@ -106,6 +116,67 @@ namespace Kakadoo
                 peak = Math.Max(peak, Math.Abs((int)BitConverter.ToInt16(pcm16, i)));
             return peak / 32768.0;
         }
+
+        /// <summary>Names of the microphones that are plugged in right now (empty if they can't be listed).</summary>
+        static string[] cachedDevices;
+        static long cachedAt;
+
+        public static string[] Devices()
+        {
+            // Listing can take a moment and a settings component asks on every solve, so reuse the answer for a few seconds.
+            var cached = cachedDevices;
+            if (cached != null && Environment.TickCount64 - cachedAt < 3000) return cached;
+            cached = ListDevices();
+            cachedAt = Environment.TickCount64;
+            return cachedDevices = cached;
+        }
+
+        static string[] ListDevices()
+        {
+            try
+            {
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT) return WindowsDevices();
+#if !NETFRAMEWORK
+                return OpenTK.Audio.OpenAL.ALC.GetStringList(OpenTK.Audio.OpenAL.GetEnumerationStringList.CaptureDeviceSpecifier).ToArray();
+#endif
+            }
+            catch (Exception)
+            {
+                // Listing is a convenience; recording still works with the default microphone.
+            }
+            return new string[0];
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static string[] WindowsDevices()
+        {
+            var names = new List<string>();
+            for (int i = 0; i < NAudio.Wave.WaveInEvent.DeviceCount; i++)
+                names.Add(NAudio.Wave.WaveInEvent.GetCapabilities(i).ProductName);
+            return names.ToArray();
+        }
+
+        /// <summary>The device number for the microphone chosen in the settings, or the default when it isn't found. Windows truncates names to 31 characters, so it matches by prefix.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static int WindowsDevice()
+        {
+            string wanted = Settings.Microphone;
+            if (string.IsNullOrWhiteSpace(wanted)) return 0;
+            var names = WindowsDevices();
+            for (int i = 0; i < names.Length; i++)
+                if (wanted.StartsWith(names[i], StringComparison.OrdinalIgnoreCase) || names[i].StartsWith(wanted, StringComparison.OrdinalIgnoreCase)) return i;
+            return 0;
+        }
+
+#if !NETFRAMEWORK
+        /// <summary>The OpenAL device name for the chosen microphone, or null for the default.</summary>
+        static string OpenALDevice()
+        {
+            string wanted = Settings.Microphone;
+            if (string.IsNullOrWhiteSpace(wanted)) return null;
+            return Devices().FirstOrDefault(d => string.Equals(d, wanted, StringComparison.OrdinalIgnoreCase));
+        }
+#endif
 
         /// <summary>Streams ~50 ms chunks of audio to <paramref name="onChunk"/> until it returns false or the token is cancelled.</summary>
         static void Capture(int sampleRate, CancellationToken token, Func<byte[], bool> onChunk)
@@ -165,7 +236,7 @@ namespace Kakadoo
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void CaptureOpenAL(int sampleRate, CancellationToken token, Func<byte[], bool> onChunk)
         {
-            var device = OpenTK.Audio.OpenAL.ALC.CaptureOpenDevice(null, sampleRate, OpenTK.Audio.OpenAL.ALFormat.Mono16, sampleRate);
+            var device = OpenTK.Audio.OpenAL.ALC.CaptureOpenDevice(OpenALDevice(), sampleRate, OpenTK.Audio.OpenAL.ALFormat.Mono16, sampleRate);
             if (device == OpenTK.Audio.OpenAL.ALCaptureDevice.Null)
                 throw new InvalidOperationException("No microphone found, or microphone access was denied (System Settings > Privacy & Security > Microphone).");
 
