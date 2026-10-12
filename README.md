@@ -134,8 +134,8 @@ On Mac, allow Rhino to use the microphone when macOS asks.
 
 | Model | Used by | Where to get it |
 |---|---|---|
-| Whisper speech model | Kakadoo, GPT, Llama, Simple, Always-On | Downloaded automatically once to `~/Kakadoo/models` (see below). |
-| Llama `.gguf` file | Kakadoo Llama | You provide it. The research used Nous-Hermes-Llama2-13B (Q4_0). |
+| Whisper speech model | Kakadoo, GPT, Llama, Simple, Always-On | Downloaded automatically once to `~/Kakadoo/models` (see below). Manual download: [`ggml-small.en.bin`](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin) (466 MB) or [`ggml-base.en.bin`](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin) (141 MB), from the [whisper.cpp models](https://huggingface.co/ggerganov/whisper.cpp/tree/main). |
+| Llama `.gguf` file | Kakadoo Llama | You provide it. The research used Nous-Hermes-Llama2-13B (Q4_0): [`nous-hermes-llama2-13b.Q4_0.gguf`](https://huggingface.co/TheBloke/Nous-Hermes-Llama2-GGUF/resolve/main/nous-hermes-llama2-13b.Q4_0.gguf) from [TheBloke/Nous-Hermes-Llama2-GGUF](https://huggingface.co/TheBloke/Nous-Hermes-Llama2-GGUF). |
 | Vosk model | Kakadoo Vosk | You provide it, from <https://alphacephei.com/vosk/models>. |
 
 The Whisper model is chosen for your PC: `small.en` (466 MB, most accurate) on a capable PC, `base.en` (141 MB, about
