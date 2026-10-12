@@ -29,6 +29,7 @@ All components are in the **Kakadoo** tab, **Voice** panel.
 | **Kakadoo Always-On** | Always listening. Say the catchphrase (default *"hey kakadoo"*) and then your command; the command is output as text. | Nothing else |
 | **Kakadoo Simple** | Listens once and outputs what you said as text. | Nothing else |
 | **Kakadoo Checker** | Tests your microphone, speech engine, models, cores and graphics card, and tells you what is missing. | Nothing else |
+| **Kakadoo Settings** | One optional place for shared settings: microphone, speech model, listening preset and the listening animation. | Nothing else |
 
 ### Inputs and outputs
 
@@ -38,9 +39,10 @@ All components are in the **Kakadoo** tab, **Voice** panel.
 | Kakadoo Vosk | `Sliders`, `Model Directory Path` (Vosk folder), `Run` | `Output` |
 | Kakadoo Llama | `Sliders`, `Model Directory Path` (`.gguf` file), `Run`, `Device` | `Output` |
 | Kakadoo GPT | `Sliders`, `API Key`, `Description`, `Run` | `Output` |
-| Kakadoo Always-On | `run`, `Model Path` (optional) | `info`, `text` |
+| Kakadoo Always-On | `Run`, `Model Path` (optional) | `Status`, `Text` |
 | Kakadoo Simple | `Run` | `Output`, `Command` |
 | Kakadoo Checker | `Run`, `Model Directory Path`, `Vosk Model Path` | `Output` |
+| Kakadoo Settings | `Microphone`, `Model`, `Preset`, `Animation`, `Remember` (all optional) | `Microphones`, `Active` |
 
 Connect a **Button** or **Boolean Toggle** to `Run`. Components start listening when `Run` turns on.
 
@@ -62,12 +64,55 @@ The **Kakadoo Checker** shows how many cores your PC has and how many it recomme
 * With many sliders on the CPU the model has a lot to read and each command can take minutes. Use the GPU for large
   slider sets.
 
+### Kakadoo Settings
+
+Optional. Drop one into the document to change settings that every Kakadoo component shares. Leave an input empty to keep
+its current value. Only the first Settings component in a document counts.
+
+| Input | Meaning |
+|---|---|
+| `Microphone` | The microphone to listen with: its name, or its number in the `Microphones` output (0 is the first). Empty uses the system default. Changing it takes effect at once. |
+| `Model` | `auto`, `fast` (smaller, quicker) or `accurate` (bigger, more precise). |
+| `Preset` | A bundle of listening settings: `standard`, `quiet` (quiet room, more sensitive), `noisy` (workshop, needs a louder voice), `fast` (quick replies, smaller model) or `accurate` (waits longer, bigger model). `Model`, if set, overrides the preset's model. |
+| `Animation` | Show or hide the red listening animation on all components. |
+| `Remember` | `true` also keeps these values as the defaults on this PC (`~/Kakadoo/settings.txt`). Otherwise they last for the Rhino session. |
+
+The `Microphones` output lists the microphones found on this PC; `Active` shows what is in use.
+
+### Always-On: Trigger and Tether
+
+A new **Kakadoo Always-On** has two inputs (`Run`, `Model Path`) and two outputs (`Status`, `Text`). `Status` shows the latest
+thing it heard or did. Right-click it to choose one of two extras:
+
+* **Trigger**: adds a `Trigger` input (a list of words) and a `Hit` output. When one of the words is heard anywhere in a
+  sentence, `Hit` is `true` for the *Trigger seconds* set in the same menu (default 5), then `false`. Use it to switch other
+  components, including ones that are not from Kakadoo.
+* **Tether**: adds a `Tether` output. Wire it to the `Tether` input of other Kakadoo components (right-click them and tick
+  *Tether input*, which replaces their `Run` input). Say the catchphrase and a command in one go, for example
+  *"hey kakadoo, set the width to 30"*, and Always-On passes the sentence to every tethered component, which acts on it
+  without listening again. If you say only the catchphrase, the next phrase is passed along. A tethered component shows one
+  red ripple when the change is done, and a component that is still busy skips the new sentence. While Tether is on, Trigger
+  is not available.
+
+Only Always-On uses the microphone in a tethered setup, so components never compete for it.
+
+### Listening indicator
+
+While a component listens, a red ripple spreads out from its edge, stronger when the microphone hears more sound. Right-click
+a component and untick *Breathing animation* to turn it off for that component (a still red outline stays), or use the
+`Animation` input of Kakadoo Settings for all components. Errors, such as a blocked microphone or a failed download, are shown
+in plain words under the component.
+
 ### Right-click settings
 
 | Setting | Where | Meaning |
 |---|---|---|
 | Keep last runs | Components with an `Output` | How many runs of messages to keep (default 4). |
 | Catchphrase | Kakadoo Always-On | The words that wake it. Empty means it outputs everything you say. |
+| Trigger, Trigger seconds | Kakadoo Always-On | Adds the `Trigger` input and `Hit` output, and how long `Hit` stays true. |
+| Tether | Kakadoo Always-On | Adds the `Tether` output to start other Kakadoo components by voice. |
+| Tether input | Kakadoo, Vosk, Llama, GPT, Simple | Replaces `Run` with a `Tether` input. |
+| Breathing animation | All Kakadoo components | The red listening ripple on or off. |
 | Whisper model file or folder | All components that use Whisper except Always-On | Use a model you installed yourself (see [Offline use](#offline-use)). |
 | GPU layers | Kakadoo Llama | `0` means as many as fit. |
 
