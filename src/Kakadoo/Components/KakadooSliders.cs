@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -17,7 +17,6 @@ namespace Kakadoo
     /// </summary>
     public class KakadooSliders : KakadooComponent
     {
-        static readonly Regex NumberPattern = new Regex(@"[-+]?\d*\.\d+|\d+", RegexOptions.Compiled);
 
         readonly ISpeechListener listener = SpeechListeners.Create();
         readonly object gate = new object();
@@ -27,7 +26,7 @@ namespace Kakadoo
         public KakadooSliders()
           : base("Kakadoo", "Kkdoo",
               "Say a slider's name and a number to set it, e.g. \"height 20\"",
-              "Kakadoo", "Voice")
+              "Kakadoo", " Voice")
         {
         }
 
@@ -35,6 +34,7 @@ namespace Kakadoo
         {
             pManager.AddNumberParameter("Sliders", "S", "Connect the sliders you want to manipulate", GH_ParamAccess.list);
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
+            AddWhisperInput(pManager);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -46,6 +46,7 @@ namespace Kakadoo
         {
             bool run = false;
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
+            ApplyWhisperInput(DA, listener);
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
             bool woken = ConsumeTether(!running);
@@ -85,9 +86,7 @@ namespace Kakadoo
                 command = command.ToLowerInvariant();
                 Log("Recognized speech: " + command);
 
-                var number = NumberPattern.Match(command);
-                if (!number.Success) { Log("No number found in the command, e.g. \"height 20\"."); return; }
-                double value = double.Parse(number.Value, CultureInfo.InvariantCulture);
+                if (!NumberWords.TryExtract(command, out double value)) { Log("No number found in the command, e.g. \"height 20\" or \"height twenty\"."); return; }
 
                 var matched = SliderUtil.MatchByName(sliders, command);
                 if (matched.Count == 0) { Log("No slider name found in the command."); return; }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -22,6 +22,7 @@ namespace Kakadoo
             ["sixty"] = 60, ["seventy"] = 70, ["eighty"] = 80, ["ninety"] = 90
         };
 
+        static readonly Regex ThousandsComma = new Regex(@"(?<=\d),(?=\d{3}(?!\d))", RegexOptions.Compiled);
         static readonly Regex Digits = new Regex(@"^[-+]?\d*\.\d+$|^[-+]?\d+$", RegexOptions.Compiled);
 
         public static bool TryExtract(string text, out double value)
@@ -29,15 +30,20 @@ namespace Kakadoo
             value = 0;
             if (string.IsNullOrWhiteSpace(text)) return false;
 
-            var words = text.ToLowerInvariant().Split(new[] { ' ', '-', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < words.Length; i++)
+            var words = Tokenize(text);
+            for (int i = 0; i < words.Count; i++)
             {
                 if (Digits.IsMatch(words[i]))
                     return double.TryParse(words[i], NumberStyles.Float, CultureInfo.InvariantCulture, out value);
 
                 if (words[i] == "minus" || words[i] == "negative")
                 {
+                    if (i + 1 < words.Count && Digits.IsMatch(words[i + 1]) && double.TryParse(words[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out value)) { value = -value; return true; }
                     if (TryParseRun(words, i + 1, out value)) { value = -value; return true; }
+                }
+                else if (words[i] == "point" && i + 1 < words.Count && Units.TryGetValue(words[i + 1], out int firstDigit) && firstDigit < 10 && TryParseRun(words, i, out value))
+                {
+                    return true; // "point five"
                 }
                 else if (TryParseRun(words, i, out value))
                 {
@@ -47,31 +53,48 @@ namespace Kakadoo
             return false;
         }
 
+        // Splits on spaces and commas, drops the punctuation Whisper adds ("45." / "forty-five!"), and splits hyphenated
+        // words ("forty-five") but keeps a leading minus on digits ("-5").
+        static List<string> Tokenize(string text)
+        {
+            var words = new List<string>();
+            text = ThousandsComma.Replace(text, ""); // "1,000" is one number, not 1 and 000
+            foreach (var raw in text.ToLowerInvariant().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string token = raw.Trim('.', '!', '?', ';', ':', '"', '\'', '(', ')', '%');
+                if (token.Length == 0) continue;
+                if (Digits.IsMatch(token)) words.Add(token);
+                else words.AddRange(token.Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries));
+            }
+            return words;
+        }
+
         // Parses a run of number words starting at 'start': integer part, then optional "point" digits.
-        static bool TryParseRun(string[] words, int start, out double value)
+        static bool TryParseRun(List<string> words, int start, out double value)
         {
             value = 0;
             int total = 0, current = 0, i = start;
             bool any = false;
 
-            for (; i < words.Length; i++)
+            for (; i < words.Count; i++)
             {
                 string w = words[i];
                 if (Units.TryGetValue(w, out int u)) { current += u; any = true; }
                 else if (Tens.TryGetValue(w, out int t)) { current += t; any = true; }
                 else if (w == "hundred" && any) { current = (current == 0 ? 1 : current) * 100; }
                 else if (w == "thousand" && any) { total += (current == 0 ? 1 : current) * 1000; current = 0; }
-                else if (w == "and" && any && i + 1 < words.Length && (Units.ContainsKey(words[i + 1]) || Tens.ContainsKey(words[i + 1]))) { }
+                else if (w == "and" && any && i + 1 < words.Count && (Units.ContainsKey(words[i + 1]) || Tens.ContainsKey(words[i + 1]))) { }
                 else break;
             }
-            if (!any) return false;
+            bool leadingPoint = start + 1 < words.Count && words[start] == "point" && Units.TryGetValue(words[start + 1], out int first) && first < 10;
+            if (!any && !leadingPoint) return false;
 
             value = total + current;
 
-            if (i < words.Length && words[i] == "point")
+            if (i < words.Count && words[i] == "point")
             {
                 double scale = 0.1;
-                for (i++; i < words.Length && Units.TryGetValue(words[i], out int d) && d < 10; i++, scale /= 10)
+                for (i++; i < words.Count && Units.TryGetValue(words[i], out int d) && d < 10; i++, scale /= 10)
                     value += d * scale;
             }
             return true;

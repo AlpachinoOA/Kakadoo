@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,11 +20,14 @@ namespace Kakadoo
 
         readonly string modelPath;
         readonly int seconds;
+        readonly bool phrases;
 
-        public VoskListener(string modelPath, int seconds = 5)
+        /// <param name="phrases">True = wait for a phrase and stop when it ends (for Always-On); false = record a fixed window.</param>
+        public VoskListener(string modelPath, int seconds = 5, bool phrases = false)
         {
             this.modelPath = modelPath;
             this.seconds = seconds;
+            this.phrases = phrases;
         }
 
         public Task<string> ListenOnceAsync(CancellationToken token)
@@ -36,7 +39,10 @@ namespace Kakadoo
 
                 NativeResolver.Register();
                 var model = GetModel(root);
-                byte[] audio = Microphone.Record(SampleRate, TimeSpan.FromSeconds(seconds), token);
+                byte[] audio = phrases
+                    ? Microphone.RecordPhrase(SampleRate, TimeSpan.FromSeconds(6), TimeSpan.FromSeconds(15), token)
+                    : Microphone.Record(SampleRate, TimeSpan.FromSeconds(seconds), token);
+                if (phrases && audio.Length < SampleRate * 2 * 0.4) return null; // nothing said, or just a click
 
                 using (var recognizer = new VoskRecognizer(model, SampleRate))
                 {

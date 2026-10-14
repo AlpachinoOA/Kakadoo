@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -19,6 +19,11 @@ namespace Kakadoo
             @"(?:change_slider_value\s*\(\s*)?(?:str\s*\(\s*)?[""']?(?<name>[^,""'()]+?)[""']?\s*\)?\s*,\s*(?:str\s*\(\s*)?[""']?(?<value>[-+]?\d+(?:\.\d+)?)(?<pct>\s*%)?",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        static readonly Regex WordsPattern = new Regex(
+            @"(?:change_slider_value\s*\(\s*)?(?:str\s*\(\s*)?[""']?(?<name>[^,""'()]+?)[""']?\s*\)?\s*,\s*(?<rest>[^)
+]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>Parses a model reply into a slider name and new value ("+20%" means relative to the current value).</summary>
         public static bool TryParseCall(string text, out string name, out double value, out bool isPercent)
         {
@@ -26,7 +31,15 @@ namespace Kakadoo
             value = 0;
             isPercent = false;
             var match = CallPattern.Match(text ?? string.Empty);
-            if (!match.Success) return false;
+            if (!match.Success)
+            {
+                // The model wrote the number in words ("height, forty five"): read it the same way as spoken commands.
+                var loose = WordsPattern.Match(text ?? string.Empty);
+                if (!loose.Success || !NumberWords.TryExtract(loose.Groups["rest"].Value, out value)) return false;
+                name = loose.Groups["name"].Value.Trim();
+                isPercent = loose.Groups["rest"].Value.Contains("%");
+                return name.Length > 0;
+            }
             name = match.Groups["name"].Value.Trim();
             isPercent = match.Groups["pct"].Success;
             return double.TryParse(match.Groups["value"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
