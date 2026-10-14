@@ -182,7 +182,9 @@ namespace Kakadoo
             if (audio.Length == 0) return (Outcome.Failed, "no audio was recorded.");
 
             double peak = Microphone.Peak(audio);
-            if (peak == 0) return (Outcome.Failed, "the microphone records only silence. It may be muted, or the wrong device is selected in the Windows sound settings.");
+            if (peak == 0) return (Outcome.Failed, Hardware.IsMac
+                ? "the microphone records only silence. Most likely Rhino has no microphone permission: open System Settings > Privacy & Security > Microphone, turn on Rhino 8 (add it if missing), then restart Rhino. Otherwise check the input device in System Settings > Sound."
+                : "the microphone records only silence. It may be muted, or the wrong device is selected in the Windows sound settings.");
             string level = (peak * 100).ToString("0.0", CultureInfo.InvariantCulture);
             return (Outcome.Passed, "recorded 1 second (peak level " + level + "/100 - speak while checking to see it rise).");
         }

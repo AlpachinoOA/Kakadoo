@@ -26,6 +26,7 @@ namespace Kakadoo
         {
             if (registered) return IsGpuBuild == wantGpu || RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
             registered = true;
+            MacTrust.Prepare();
 
             string dir = FindNativeDirectory(wantGpu);
             LibrariesFound = dir != null;

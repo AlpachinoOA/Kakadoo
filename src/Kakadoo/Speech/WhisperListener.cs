@@ -351,6 +351,7 @@ namespace Kakadoo
         public static void Register()
         {
             if (registered) return;
+            MacTrust.Prepare();
 
 #if NET7_0_OR_GREATER
             // The Whisper libraries use AVX2 instructions; on an older processor they would crash instead of failing cleanly.

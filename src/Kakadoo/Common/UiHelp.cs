@@ -16,7 +16,9 @@ namespace Kakadoo
             if (e is SpeechSetupException)
                 return e.Message;
             if (e is UnauthorizedAccessException)
-                return "Access was denied. Allow microphone access for desktop apps in your system privacy settings, then run again.";
+                return Hardware.IsMac
+                    ? "Access was denied. Allow Rhino in System Settings > Privacy & Security > Microphone (and Files and Folders if asked), then restart Rhino."
+                    : "Access was denied. Allow microphone access for desktop apps in your system privacy settings, then run again.";
             if (e is HttpRequestException || e is WebException)
                 return "The model could not be downloaded. Check your internet connection, or put the model file in " + WhisperModelFolder + " (or set its path in the right-click menu).";
             if (e is OutOfMemoryException)
@@ -24,7 +26,9 @@ namespace Kakadoo
             if (e is IOException && e.Message.IndexOf("space", StringComparison.OrdinalIgnoreCase) >= 0)
                 return "Not enough disk space to save the model in " + WhisperModelFolder + ".";
             if (e is DllNotFoundException || e is BadImageFormatException)
-                return "A required library could not be loaded (" + e.Message + "). Reinstall Kakadoo and the Microsoft Visual C++ Redistributable (x64).";
+                return Hardware.IsMac
+                    ? "A required library was blocked by macOS (" + e.Message + "). In Terminal run: xattr -dr com.apple.quarantine <Kakadoo plugin folder> and restart Rhino. See the README for the full commands."
+                    : "A required library could not be loaded (" + e.Message + "). Reinstall Kakadoo and the Microsoft Visual C++ Redistributable (x64).";
             return e.Message;
         }
 

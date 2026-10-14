@@ -83,6 +83,7 @@ namespace Kakadoo
 #if !NETFRAMEWORK
             if (registered) return;
             registered = true;
+            MacTrust.Prepare();
             NativeLibrary.SetDllImportResolver(typeof(Model).Assembly, (name, assembly, path) =>
             {
                 if (name != "libvosk") return IntPtr.Zero;
