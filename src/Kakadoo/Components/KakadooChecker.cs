@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -27,7 +27,7 @@ namespace Kakadoo
         public KakadooChecker()
           : base("Kakadoo Checker", "KkChk",
               "Checks that your microphone, speech engine and model are ready for Kakadoo",
-              "Kakadoo", "Voice")
+              "Kakadoo", "Utilities")
         {
         }
 
@@ -36,10 +36,11 @@ namespace Kakadoo
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddBooleanParameter("Run", "R", "Connect a Boolean Toggle to test the microphone", GH_ParamAccess.item, false);
-            pManager.AddTextParameter("Model Directory Path", "M", "Path to the Llama GGUF model file to check (Kakadoo Llama)", GH_ParamAccess.item);
-            pManager.AddTextParameter("Vosk Model Path", "V", "Path to the Vosk model folder to check (Kakadoo Vosk)", GH_ParamAccess.item);
-            pManager[1].Optional = true;
+            AddWhisperInput(pManager);
+            pManager.AddTextParameter("Llama Model Directory Path", "Llama Model Directory Path", "Path to the Llama GGUF model file to check (Kakadoo Llama)", GH_ParamAccess.item);
+            pManager.AddTextParameter("Vosk Model Directory Path", "Vosk Model Directory Path", "Path to the Vosk model folder to check (Kakadoo Vosk)", GH_ParamAccess.item);
             pManager[2].Optional = true;
+            pManager[3].Optional = true;
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -50,10 +51,11 @@ namespace Kakadoo
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             bool run = false;
-            string llamaPath = null, voskPath = null;
+            string whisperPath = null, llamaPath = null, voskPath = null;
             DA.GetData(0, ref run);
-            DA.GetData(1, ref llamaPath);
-            DA.GetData(2, ref voskPath);
+            DA.GetData(1, ref whisperPath);
+            DA.GetData(2, ref llamaPath);
+            DA.GetData(3, ref voskPath);
 
             bool trigger = run && !lastRun;
             lastRun = run;
@@ -63,7 +65,7 @@ namespace Kakadoo
                 running = true;
                 Message = "Checking";
                 lock (gate) messages.Clear();
-                Task.Run(() => RunChecksAsync(llamaPath, voskPath));
+                Task.Run(() => RunChecksAsync(whisperPath, llamaPath, voskPath));
             }
             else if (!run && !running)
             {
@@ -73,13 +75,13 @@ namespace Kakadoo
             lock (gate) DA.SetDataList(0, new List<string>(messages));
         }
 
-        async Task RunChecksAsync(string llamaPath, string voskPath)
+        async Task RunChecksAsync(string whisperPath, string llamaPath, string voskPath)
         {
             passed = failed = skipped = 0;
             try
             {
                 // Every check runs on its own, so one failure never hides the others.
-                await Step("Speech engine (Whisper)", () => Task.FromResult(CheckSpeechEngine()));
+                await Step("Speech engine (Whisper)", () => Task.FromResult(CheckSpeechEngine(whisperPath)));
                 await Step("Backup speech engine", () => Task.FromResult(CheckFallbackEngine()));
                 await Step("Microphone", CheckMicrophoneAsync);
                 await Step("Processor cores (Kakadoo Llama)", () => Task.FromResult(CheckCores()));
@@ -128,15 +130,15 @@ namespace Kakadoo
             }
         }
 
-        (Outcome, string) CheckSpeechEngine()
+        (Outcome, string) CheckSpeechEngine(string whisperPath)
         {
             try
             {
-                string file = WhisperModel.Locate(out string source);
+                string file = WhisperModel.Locate(out string source, whisperPath);
                 if (file == null)
                 {
                     Log("No Whisper model found on this PC. Downloading '" + WhisperModel.Name + "' once (free) to " + WhisperModel.Directory + " ...");
-                    file = WhisperModel.EnsureAvailable();
+                    file = WhisperModel.EnsureAvailable(whisperPath);
                     source = "download";
                 }
 
@@ -212,7 +214,7 @@ namespace Kakadoo
         {
             path = path?.Trim().Trim('"');
             if (string.IsNullOrWhiteSpace(path))
-                return (Outcome.Skipped, "no 'Model Directory Path' connected. Connect the path to your .gguf file to check it.");
+                return (Outcome.Skipped, "no 'Llama Model Directory Path' connected. Connect the path to your .gguf file to check it.");
             if (!File.Exists(path))
                 return (Outcome.Failed, "file not found at " + path + ".");
 
@@ -236,7 +238,7 @@ namespace Kakadoo
         (Outcome, string) CheckVosk(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
-                return (Outcome.Skipped, "no 'Vosk Model Path' connected. Connect the model folder to check it.");
+                return (Outcome.Skipped, "no 'Vosk Model Directory Path' connected. Connect the model folder to check it.");
 
             string root = VoskListener.FindModelRoot(path);
             if (root == null)

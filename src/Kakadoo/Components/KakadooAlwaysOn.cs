@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -42,7 +42,7 @@ namespace Kakadoo
         public KakadooAlwaysOn()
           : base("Kakadoo Always-On", "KkAO",
               "Always listening. Say the catchphrase (default \"hey kakadoo\") and then your command, and it is output as text",
-              "Kakadoo", "Voice")
+              "Kakadoo", " Voice")
         {
         }
 
@@ -51,7 +51,7 @@ namespace Kakadoo
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddBooleanParameter("Run", "Run", "Activate this to keep listening", GH_ParamAccess.item, false);
-            pManager.AddTextParameter("Model Path", "Model Path", "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.", GH_ParamAccess.item);
+            pManager.AddTextParameter(KakadooComponent.WhisperInputName, KakadooComponent.WhisperInputName, "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.", GH_ParamAccess.item);
             pManager[1].Optional = true;
         }
 
@@ -104,6 +104,31 @@ namespace Kakadoo
 
         /// <summary>Whether the Tether output is shown. While it is, the Trigger input and Hit output are not.</summary>
         public bool TetherOn { get; private set; }
+
+        /// <summary>Listen with Vosk instead of Whisper. The model input at position 1 is swapped to match.</summary>
+        public bool UseVosk { get; private set; }
+
+        void SetVosk(bool on)
+        {
+            if (on == UseVosk) return;
+            UseVosk = on;
+            var old = Params.Input[1];
+            var sources = old.Sources.ToList();
+            string name = on ? KakadooComponent.VoskInputName : KakadooComponent.WhisperInputName;
+            var swapped = new Grasshopper.Kernel.Parameters.Param_String
+            {
+                Name = name,
+                NickName = name,
+                Description = on
+                    ? "Optional: the folder of a Vosk model. Blank uses the Vosk model installed in the Kakadoo folder."
+                    : "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.",
+                Access = GH_ParamAccess.item,
+                Optional = true
+            };
+            Params.UnregisterInputParameter(old);
+            Params.RegisterInputParam(swapped, 1);
+            foreach (var source in sources) swapped.AddSource(source);
+        }
 
         void SetTether(bool on)
         {
@@ -197,10 +222,19 @@ namespace Kakadoo
                 try
                 {
                     // Helps the recogniser spell the catchphrase the way we match it.
-                    SpeechListeners.SetHint(listener, string.IsNullOrWhiteSpace(Catchphrase) ? new string[0] : new[] { Catchphrase });
-                    if (listener is IModelPathListener withModel) withModel.ModelPath = modelPath;
+                    ISpeechListener active = listener;
+                    if (UseVosk)
+                    {
+                        string path = modelPath;
+                        active = new VoskListener(string.IsNullOrWhiteSpace(path) ? SpeechListeners.DefaultVoskModelPath() : path, phrases: true);
+                    }
+                    else
+                    {
+                        SpeechListeners.SetHint(listener, string.IsNullOrWhiteSpace(Catchphrase) ? new string[0] : new[] { Catchphrase });
+                        if (listener is IModelPathListener withModel) withModel.ModelPath = modelPath;
+                    }
 
-                    string heard = await SpeechListeners.ListenAsync(listener, m => Info(m), token);
+                    string heard = await SpeechListeners.ListenAsync(active, m => Info(m), token);
                     if (token.IsCancellationRequested) break;
                     if (string.IsNullOrWhiteSpace(heard)) continue;
 
@@ -339,6 +373,9 @@ namespace Kakadoo
             Menu_AppendItem(menu, "Catchphrase (blank = output everything you say):", null, false);
             Menu_AppendTextItem(menu, Catchphrase ?? "", null, (box, text) => Catchphrase = text, true);
             Menu_AppendSeparator(menu);
+            Menu_AppendItem(menu, "Speech engine: Whisper", (s, e) => { SetVosk(false); Params.OnParametersChanged(); ExpireSolution(true); }, true, !UseVosk);
+            Menu_AppendItem(menu, "Speech engine: Vosk", (s, e) => { SetVosk(true); Params.OnParametersChanged(); ExpireSolution(true); }, true, UseVosk);
+            Menu_AppendSeparator(menu);
             if (!TetherOn)
             Menu_AppendItem(menu, "Trigger", (s, e) =>
             {
@@ -370,6 +407,7 @@ namespace Kakadoo
             writer.SetString("Catchphrase", Catchphrase ?? "");
             writer.SetBoolean("TriggerOn", TriggerOn);
             writer.SetBoolean("TetherOn", TetherOn);
+            writer.SetBoolean("UseVosk", UseVosk);
             writer.SetDouble("TriggerSeconds", TriggerSeconds);
             ProgressAttributes.Write(this, writer);
             return base.Write(writer);
@@ -384,6 +422,8 @@ namespace Kakadoo
             double seconds = 5;
             if (reader.TryGetDouble("TriggerSeconds", ref seconds)) TriggerSeconds = Math.Max(0.1, Math.Min(600, seconds));
             if (reader.TryGetBoolean("TriggerOn", ref on) && on) SetTrigger(true);
+            bool vosk = false;
+            if (reader.TryGetBoolean("UseVosk", ref vosk) && vosk) SetVosk(true);
             bool tether = false;
             if (reader.TryGetBoolean("TetherOn", ref tether) && tether) SetTether(true);
             ProgressAttributes.Read(this, reader);

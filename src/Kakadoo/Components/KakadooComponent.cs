@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -82,9 +82,10 @@ namespace Kakadoo
         /// <summary>Whether the Tether input is shown (a right-click setting).</summary>
         public bool TetherOn { get; private set; }
 
-        // The Run input is not needed (and gets in the way) when the component is started by voice from Always-On, so it is swapped out.
-        IGH_Param removedRun;
-        int removedRunIndex;
+        // Run and the speech-model inputs are not needed (and get in the way) when the component is started by voice from
+        // Always-On, which does the listening, so they are swapped out for the Tether input.
+        readonly List<KeyValuePair<int, IGH_Param>> removedInputs = new List<KeyValuePair<int, IGH_Param>>();
+        static bool GoesWithTether(IGH_Param p) => p.Name == "Run" || p.Name == WhisperInputName || p.Name == VoskInputName;
 
         /// <summary>Index of the Run input, or -1 while it is swapped out for the Tether input.</summary>
         protected int RunIndex => Params.Input.FindIndex(p => p.Name == "Run");
@@ -95,12 +96,11 @@ namespace Kakadoo
             TetherOn = on;
             if (on)
             {
-                int run = RunIndex;
-                if (run >= 0)
+                for (int i = Params.Input.Count - 1; i >= 0; i--)
                 {
-                    removedRun = Params.Input[run];
-                    removedRunIndex = run;
-                    Params.UnregisterInputParameter(removedRun);
+                    if (!GoesWithTether(Params.Input[i])) continue;
+                    removedInputs.Insert(0, new KeyValuePair<int, IGH_Param>(i, Params.Input[i]));
+                    Params.UnregisterInputParameter(Params.Input[i]);
                 }
                 var tetherParam = new TetherParam();
                 Params.RegisterInputParam(tetherParam);
@@ -110,11 +110,9 @@ namespace Kakadoo
             {
                 var tether = Params.Input.OfType<TetherParam>().FirstOrDefault();
                 if (tether != null) Params.UnregisterInputParameter(tether);
-                if (removedRun != null)
-                {
-                    Params.RegisterInputParam(removedRun, Math.Min(removedRunIndex, Params.Input.Count));
-                    removedRun = null;
-                }
+                foreach (var removed in removedInputs) // lowest index first, so each goes back where it was
+                    Params.RegisterInputParam(removed.Value, Math.Min(removed.Key, Params.Input.Count));
+                removedInputs.Clear();
                 Interlocked.Exchange(ref tetherText, null);
                 Interlocked.Exchange(ref tetherPending, 0);
             }
@@ -199,18 +197,26 @@ namespace Kakadoo
                     ExpireSolution(true);
                 }, true, TetherOn);
             ProgressAttributes.AppendMenu(menu, this);
-            if (UsesWhisper) AppendWhisperMenu(menu);
         }
 
-        /// <summary>Whether this component listens with Whisper, and so shows the model path setting.</summary>
-        protected virtual bool UsesWhisper => true;
+        public const string WhisperInputName = "Whisper Model Path";
+        public const string VoskInputName = "Vosk Model Directory Path";
 
-        /// <summary>The "Whisper model file or folder" entry, shared by every component that listens with Whisper.</summary>
-        public static void AppendWhisperMenu(ToolStripDropDown menu)
+        /// <summary>Adds the optional "Whisper Model Path" input, shared by every component that listens with Whisper.</summary>
+        protected static void AddWhisperInput(GH_InputParamManager pManager)
         {
-            Menu_AppendSeparator(menu);
-            Menu_AppendItem(menu, "Whisper model file or folder (blank = automatic):", null, false);
-            Menu_AppendTextItem(menu, Settings.WhisperModelPath ?? "", null, (box, text) => Settings.WhisperModelPath = text, true);
+            int i = pManager.AddTextParameter(WhisperInputName, WhisperInputName,
+                "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.", GH_ParamAccess.item);
+            pManager[i].Optional = true;
+        }
+
+        /// <summary>Reads the Whisper Model Path input and hands it to the listener (null = automatic model).</summary>
+        protected void ApplyWhisperInput(IGH_DataAccess DA, ISpeechListener listener)
+        {
+            string path = null;
+            int i = Params.Input.FindIndex(p => p.Name == WhisperInputName);
+            if (i >= 0) DA.GetData(i, ref path);
+            if (listener is IModelPathListener withModel) withModel.ModelPath = string.IsNullOrWhiteSpace(path) ? null : path.Trim().Trim('"');
         }
 
         public override bool Write(GH_IWriter writer)

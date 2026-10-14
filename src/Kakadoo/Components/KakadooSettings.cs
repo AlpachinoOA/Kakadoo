@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 
@@ -15,7 +15,7 @@ namespace Kakadoo
         public KakadooSettings()
           : base("Kakadoo Settings", "KkSet",
               "Shared settings for all Kakadoo components: microphone, speech model and the listening animation. Leave an input empty to keep the current value.",
-              "Kakadoo", "Voice")
+              "Kakadoo", "Utilities")
         {
         }
 

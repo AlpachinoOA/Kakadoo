@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -23,14 +23,14 @@ namespace Kakadoo
         public KakadooVosk()
           : base("Kakadoo Vosk", "KkVsk",
               "Say a slider's name and a number, fully offline. Spoken numbers like \"twelve\" work too",
-              "Kakadoo", "Voice")
+              "Kakadoo", " Voice")
         {
         }
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddNumberParameter("Sliders", "S", "Connect the sliders you want to manipulate", GH_ParamAccess.list);
-            pManager.AddTextParameter("Model Directory Path", "M", "Path to the folder of the Vosk model", GH_ParamAccess.item);
+            pManager.AddTextParameter(VoskInputName, VoskInputName, "Path to the folder of the Vosk model", GH_ParamAccess.item);
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
         }
 
@@ -43,7 +43,8 @@ namespace Kakadoo
         {
             string modelPath = null;
             bool run = false;
-            DA.GetData(1, ref modelPath);
+            int pathIndex = Params.Input.FindIndex(p => p.Name == VoskInputName); // absent while Tether is on
+            if (pathIndex >= 0) DA.GetData(pathIndex, ref modelPath);
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
@@ -74,10 +75,16 @@ namespace Kakadoo
             try
             {
                 if (sliders.Count == 0) { Log("No named sliders connected. Connect number sliders that have a name."); return; }
-                if (string.IsNullOrWhiteSpace(modelPath)) { Log("No Vosk model path provided. Connect the folder of a Vosk model."); return; }
 
                 string command;
-                try { command = await HearAsync(() => new VoskListener(modelPath).ListenOnceAsync(CancellationToken.None)); }
+                try
+                {
+                    command = await HearAsync(() =>
+                    {
+                        if (string.IsNullOrWhiteSpace(modelPath)) throw new SpeechSetupException("No Vosk model path provided. Connect the folder of a Vosk model.");
+                        return new VoskListener(modelPath).ListenOnceAsync(CancellationToken.None);
+                    });
+                }
                 catch (Exception e) { Log(ErrorHelp.Report(this, e)); return; }
 
                 if (string.IsNullOrWhiteSpace(command)) { Log("Could not understand audio. Please try again."); return; }
@@ -120,8 +127,6 @@ namespace Kakadoo
         }
 
         protected override Bitmap Icon => Icons.Load("KakadooVosk");
-
-        protected override bool UsesWhisper => false;
 
         public override GH_Exposure Exposure => GH_Exposure.primary;
 

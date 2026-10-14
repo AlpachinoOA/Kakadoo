@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -24,13 +24,14 @@ namespace Kakadoo
         public KakadooSimple()
           : base("Kakadoo Simple", "KkSmp",
               "Listens once and returns what you said as text",
-              "Kakadoo", "Voice")
+              "Kakadoo", " Voice")
         {
         }
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
+            AddWhisperInput(pManager);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -43,6 +44,7 @@ namespace Kakadoo
         {
             bool run = false;
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
+            ApplyWhisperInput(DA, listener);
 
             // Only trigger on the rising edge so re-solves don't relisten.
             bool woken = ConsumeTether(!running);

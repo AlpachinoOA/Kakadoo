@@ -30,7 +30,7 @@ namespace Kakadoo
     {
         public TetherParam()
           : base("Tether", "Tether", "Connect Always-On's Tether output to the Tether input of a Kakadoo component to start it by voice. The sentence you say is passed along.",
-              "Kakadoo", "Voice", GH_ParamAccess.item)
+              "Kakadoo", " Voice", GH_ParamAccess.item)
         {
             Optional = true;
         }

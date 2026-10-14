@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -42,7 +42,7 @@ namespace Kakadoo
         public KakadooGPT()
           : base("Kakadoo GPT", "KkGPT",
               "Speak naturally, e.g. \"make the building higher\". OpenAI GPT picks the slider and value (needs an API key)",
-              "Kakadoo", "Voice")
+              "Kakadoo", " Voice")
         {
         }
 
@@ -60,6 +60,7 @@ namespace Kakadoo
             pManager.AddTextParameter("API Key", "K", "OpenAI API Key", GH_ParamAccess.item);
             pManager.AddTextParameter("Description", "D", "Brief description about the environment", GH_ParamAccess.item, "");
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
+            AddWhisperInput(pManager);
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
@@ -74,6 +75,7 @@ namespace Kakadoo
             DA.GetData(1, ref apiKey);
             DA.GetData(2, ref description);
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
+            ApplyWhisperInput(DA, listener);
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
             bool woken = ConsumeTether(!running);
