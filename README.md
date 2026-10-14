@@ -182,7 +182,12 @@ Run the **Kakadoo Checker**. Each check shows `[OK]`, `[FAILED]` or `[SKIPPED]` 
 * **Llama is slow** : choose `gpu` in the `Device` input, use a smaller model, or connect fewer sliders.
 
 Notes: the plugin does not load when Rhino 8 is set to the .NET Framework runtime (use the default .NET 7/8 runtime).
-macOS support is included but has not yet been tested on real Mac hardware.
+macOS support is included but has had limited testing on real Mac hardware. If macOS says a `.dylib` "Not Opened" or Whisper fails with "library load disallowed by system policy", Kakadoo now clears the quarantine flag and signs its libraries itself on first use. If it still fails, run this in Terminal (adjust the path to your Kakadoo install) and restart Rhino:
+
+```
+xattr -dr com.apple.quarantine ~/Library/"Application Support"/McNeel/Rhinoceros/packages/8.0/Kakadoo
+find ~/Library/"Application Support"/McNeel/Rhinoceros/packages/8.0/Kakadoo -name "*.dylib" -exec codesign --force --sign - {} \;
+```
 
 ---
 
