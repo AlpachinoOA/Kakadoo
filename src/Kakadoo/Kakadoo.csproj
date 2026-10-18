@@ -134,11 +134,11 @@
     <Copy SourceFiles="$(MSBuildProjectDirectory)/../../assets/icon.png" DestinationFolder="$(OutputPath)yak-mac" />
 
     <WriteLinesToFile File="$(OutputPath)yak-win/manifest.yml" Overwrite="true" Condition="$(BuildYakPackage) == 'True'"
-                      Lines="name: kakadoo;version: 1.0.2.1;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
+                      Lines="name: kakadoo;version: 1.0.2.2;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
     <Exec Command="&quot;$(YakExecutable)&quot; build --platform win" WorkingDirectory="$(OutputPath)yak-win" Condition="$(BuildYakPackage) == 'True'" />
 
     <WriteLinesToFile File="$(OutputPath)yak-mac/manifest.yml" Overwrite="true" Condition="$(BuildYakPackage) == 'True'"
-                      Lines="name: kakadoo;version: 1.0.2.1;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
+                      Lines="name: kakadoo;version: 1.0.2.2;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
     <Exec Command="&quot;$(YakExecutable)&quot; build --platform mac" WorkingDirectory="$(OutputPath)yak-mac" Condition="$(BuildYakPackage) == 'True'" />
 
     <ItemGroup>
