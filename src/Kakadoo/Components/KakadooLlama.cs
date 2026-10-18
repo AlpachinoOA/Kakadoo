@@ -49,9 +49,11 @@ namespace Kakadoo
         {
             pManager.AddNumberParameter("Sliders", "S", "Connect the sliders you want to manipulate", GH_ParamAccess.list);
             pManager.AddTextParameter("Llama Model Directory Path", "Llama Model Directory Path", "Path to the Llama GGUF model file", GH_ParamAccess.item);
+            int d = pManager.AddTextParameter("Description", "D", "Optional: a brief description of the script and your goal, given to the model as context, e.g. \"a tower: Height is the number of floors\"", GH_ParamAccess.item, "");
+            pManager[d].Optional = true;
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
             pManager.AddTextParameter("Device", "D", "cpu or gpu (not case sensitive), optionally followed by ; and the number of CPU cores to use, e.g. gpu;6. The Kakadoo Checker shows how many cores you have and how many it recommends.", GH_ParamAccess.item, DeviceSetting.Default);
-            pManager[3].Optional = true;
+            pManager[4].Optional = true;
             AddWhisperInput(pManager);
         }
 
@@ -67,6 +69,9 @@ namespace Kakadoo
             DA.GetData(1, ref modelPath);
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
             ApplyWhisperInput(DA, listener);
+            string description = "";
+            int descIndex = Params.Input.FindIndex(p => p.Name == "Description");
+            if (descIndex >= 0) DA.GetData(descIndex, ref description);
             int deviceIndex = Params.Input.FindIndex(p => p.Name == "Device");
             if (deviceIndex >= 0) DA.GetData(deviceIndex, ref device);
 
@@ -89,7 +94,7 @@ namespace Kakadoo
                     running = true;
                     Log("Listening...", clear: true);
                     if (SliderUtil.Notice(Params.Input[0]) is string notice) Log(notice);
-                    Task.Run(() => RunCommandAsync(sliders, modelPath));
+                    Task.Run(() => RunCommandAsync(sliders, modelPath, description));
                 }
             }
             else if (!run && !running)
@@ -100,7 +105,7 @@ namespace Kakadoo
             lock (gate) DA.SetDataList(0, messages.ToList());
         }
 
-        async Task RunCommandAsync(List<GH_NumberSlider> sliders, string modelPath)
+        async Task RunCommandAsync(List<GH_NumberSlider> sliders, string modelPath, string description)
         {
             try
             {
@@ -124,7 +129,7 @@ namespace Kakadoo
                 if (promptTokens > 600 && loadedGpuLayers == 0)
                     Log("Note: " + sliders.Select(s => s.NickName.ToLowerInvariant()).Distinct().Count() + " slider names is about " + promptTokens
                         + " tokens for the model to read. On the CPU that can take minutes per command (about 4 minutes for 200 sliders on an 8-core PC). Use Device = gpu, or connect fewer sliders.");
-                string result = await QueryModelAsync(command, values);
+                string result = await QueryModelAsync(command, values, description);
                 if (string.IsNullOrWhiteSpace(result)) { Log("No result from language model."); return; }
 
                 Log(SliderUtil.ApplyReply(sliders, result));
@@ -257,13 +262,16 @@ namespace Kakadoo
             }
         }
 
-        async Task<string> QueryModelAsync(string instruction, string sliderValues)
+        async Task<string> QueryModelAsync(string instruction, string sliderValues, string description)
         {
             // With many sliders the values are listed once; for a few, a second time as the original prompt did.
             bool repeatValues = sliderValues.Length < 600;
             var prompt = new StringBuilder()
                 .AppendLine(PluginContext)
-                .AppendLine(TaskDescription)
+                .AppendLine(TaskDescription);
+            if (!string.IsNullOrWhiteSpace(description))
+                prompt.AppendLine("Description of the script and goal: " + description.Trim());
+            string promptText = prompt
                 .AppendLine("Current Slider Values: " + sliderValues)
                 .AppendLine("### Instruction:")
                 .AppendLine(instruction)
@@ -275,7 +283,7 @@ namespace Kakadoo
                 .ToString();
 
             // About 2.5 characters per token to be safe with names and numbers, plus room for the answer.
-            int needed = (int)(prompt.Length / 2.5) + 96;
+            int needed = (int)(promptText.Length / 2.5) + 96;
             if (needed > MaxContext)
                 throw new InvalidOperationException("The slider names and values are too long for the model (" + needed + " tokens, limit " + MaxContext + "). Use fewer or shorter slider names.");
             int contextSize = needed <= 2048 ? 2048 : MaxContext;
@@ -287,7 +295,7 @@ namespace Kakadoo
                 SamplingPipeline = new DefaultSamplingPipeline { Temperature = 0.1f }, AntiPrompts = new List<string> { "###", "\n\n" } };
 
             var sb = new StringBuilder();
-            await foreach (var token in executor.InferAsync(prompt, inference, cts.Token))
+            await foreach (var token in executor.InferAsync(promptText, inference, cts.Token))
                 sb.Append(token);
             return sb.ToString();
         }

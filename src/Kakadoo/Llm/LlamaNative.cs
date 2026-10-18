@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -59,6 +59,9 @@ namespace Kakadoo
 #endif
             return true;
         }
+
+        /// <summary>True if the llama.cpp libraries are in the plugin folder. Doesn't load anything, so it can't lock in the CPU build.</summary>
+        public static bool LibrariesPresent() => FindNativeDirectory(false) != null || FindNativeDirectory(true) != null;
 
         static string FindCpuDirectory() => FindNativeDirectory(false);
 

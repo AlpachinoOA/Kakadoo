@@ -41,7 +41,7 @@ namespace Kakadoo
 
         public KakadooGPT()
           : base("Kakadoo GPT", "KkGPT",
-              "Speak naturally, e.g. \"make the building higher\". OpenAI GPT picks the slider and value (needs an API key)",
+              "Speak naturally, e.g. \"make the building higher\". OpenAI GPT (model: " + Model + ") picks the slider and value (needs an API key)",
               "Kakadoo", " Voice")
         {
         }
@@ -57,8 +57,8 @@ namespace Kakadoo
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddNumberParameter("Sliders", "S", "Connect the sliders you want to manipulate", GH_ParamAccess.list);
-            pManager.AddTextParameter("API Key", "K", "OpenAI API Key", GH_ParamAccess.item);
-            pManager.AddTextParameter("Description", "D", "Brief description about the environment", GH_ParamAccess.item, "");
+            pManager.AddTextParameter("API Key", "K", "OpenAI API Key (used with the " + Model + " model)", GH_ParamAccess.item);
+            pManager.AddTextParameter("Description", "D", "Optional: a brief description of the script and your goal, given to the model as context, e.g. \"a tower: Height is the number of floors\"", GH_ParamAccess.item, "");
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
             AddWhisperInput(pManager);
         }

@@ -229,7 +229,7 @@ namespace Kakadoo
             if (sizeMb > ramMb * 0.9)
                 return (Outcome.Failed, Path.GetFileName(path) + " is " + sizeMb + " MB but this PC has only " + ramMb + " MB of memory. Use a smaller (e.g. 7B or Q4) model.");
 
-            if (!LlamaNative.Register(false))
+            if (!LlamaNative.LibrariesPresent()) // don't load them: that would lock Llama to the CPU build for this session
                 return (Outcome.Failed, "the llama.cpp libraries were not found in the plugin folder.");
 
             return (Outcome.Passed, Path.GetFileName(path) + " (" + sizeMb + " MB, this PC has " + ramMb + " MB of memory).");
