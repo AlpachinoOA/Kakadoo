@@ -22,7 +22,7 @@ namespace Kakadoo
 
         public KakadooVosk()
           : base("Kakadoo Vosk", "KkVsk",
-              "Say a slider's name and a number, fully offline. Spoken numbers like \"twelve\" work too",
+              "Say a slider's name and a number, fully offline. Spoken numbers like \"twelve\" work too. Larger Vosk models can take several minutes to load, depending on the speed of your machine",
               "Kakadoo", " Voice")
         {
         }

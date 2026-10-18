@@ -25,7 +25,7 @@ All components are in the **Kakadoo** tab: the **Voice** panel (first), and a **
 | **Kakadoo** | Say a slider's name and a number, e.g. "height 20" or "height twenty five". | Nothing else |
 | **Kakadoo Vosk** | Same as Kakadoo, fully offline with [Vosk](https://alphacephei.com/vosk/). Understands spoken numbers ("twenty five"). Can also be started by Always-On (Tether). | A Vosk model folder |
 | **Kakadoo Llama** | Speak naturally, e.g. "make the building higher". A local Llama model picks the slider and the new value. Runs on CPU or GPU. | A Llama `.gguf` model file |
-| **Kakadoo GPT** | Same idea with OpenAI's GPT. | An OpenAI API key and internet |
+| **Kakadoo GPT** | Same idea with OpenAI's GPT (model `gpt-4o-mini`). | An OpenAI API key and internet |
 | **Kakadoo Always-On** | Always listening. Say the catchphrase (default *"hey kakadoo"*) and then your command; the command is output as text. | Nothing else |
 | **Kakadoo Simple** | Listens once and outputs what you said as text. | Nothing else |
 | **Kakadoo Checker** | Tests your microphone, speech engine, models, cores and graphics card, and tells you what is missing. | Nothing else |
@@ -37,7 +37,7 @@ All components are in the **Kakadoo** tab: the **Voice** panel (first), and a **
 |---|---|---|
 | Kakadoo | `Sliders`, `Run`, `Whisper Model Path` (optional) | `Output` |
 | Kakadoo Vosk | `Sliders`, `Vosk Model Directory Path` (Vosk folder), `Run` | `Output` |
-| Kakadoo Llama | `Sliders`, `Llama Model Directory Path` (`.gguf` file), `Run`, `Device`, `Whisper Model Path` (optional) | `Output` |
+| Kakadoo Llama | `Sliders`, `Llama Model Directory Path` (`.gguf` file), `Description` (optional), `Run`, `Device`, `Whisper Model Path` (optional) | `Output` |
 | Kakadoo GPT | `Sliders`, `API Key`, `Description`, `Run`, `Whisper Model Path` (optional) | `Output` |
 | Kakadoo Always-On | `Run`, `Whisper Model Path` (optional) | `Status`, `Text` |
 | Kakadoo Simple | `Run`, `Whisper Model Path` (optional) | `Output`, `Command` |

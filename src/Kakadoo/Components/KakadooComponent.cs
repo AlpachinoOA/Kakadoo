@@ -104,7 +104,7 @@ namespace Kakadoo
                 }
                 var tetherParam = new TetherParam();
                 Params.RegisterInputParam(tetherParam);
-                tetherParam.Attributes = new TetherAttributes(tetherParam, Attributes); // the wire is drawn faint red
+                EnsureTetherAttributes();
             }
             else
             {
@@ -116,6 +116,30 @@ namespace Kakadoo
                 Interlocked.Exchange(ref tetherText, null);
                 Interlocked.Exchange(ref tetherPending, 0);
             }
+        }
+
+        /// <summary>
+        /// Makes the Tether input draw its wire red. Loading a saved file recreates the parameters' attributes, so this runs again
+        /// when the component joins a document and before each solve, not just when Tether is switched on.
+        /// </summary>
+        void EnsureTetherAttributes()
+        {
+            if (Attributes == null) return;
+            foreach (var tether in Params.Input.OfType<TetherParam>())
+                if (!(tether.Attributes is TetherAttributes))
+                    tether.Attributes = new TetherAttributes(tether, Attributes);
+        }
+
+        public override void AddedToDocument(GH_Document document)
+        {
+            base.AddedToDocument(document);
+            EnsureTetherAttributes();
+        }
+
+        protected override void BeforeSolveInstance()
+        {
+            base.BeforeSolveInstance();
+            EnsureTetherAttributes();
         }
 
         /// <summary>Called by Always-On on the UI thread. Returns false if this component doesn't take tether signals.</summary>

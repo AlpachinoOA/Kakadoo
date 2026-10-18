@@ -22,7 +22,7 @@ namespace Kakadoo
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddTextParameter("Microphone", "Mic", "Microphone to listen with: its name or its number in the Microphones output (0 = first). Empty = system default", GH_ParamAccess.item);
-            pManager.AddTextParameter("Model", "Model", "Speech model: \"auto\", \"fast\" (smaller, quicker) or \"accurate\" (bigger, more precise)", GH_ParamAccess.item);
+            pManager.AddTextParameter("Model", "Model", "Speech model: \"auto\", \"fast\" (smaller, quicker) or \"accurate\" (bigger, more precise). A model that is not on this PC yet is downloaded automatically the first time it is needed (needs internet).", GH_ParamAccess.item);
             pManager.AddTextParameter("Preset", "Preset", "A bundle of listening settings: \"standard\", \"quiet\" (quiet room, more sensitive), \"noisy\" (workshop, needs a louder voice), \"fast\" (quick replies, smaller model) or \"accurate\" (waits longer, bigger model). Model, if set, overrides the preset's model.", GH_ParamAccess.item);
             pManager.AddBooleanParameter("Animation", "Anim", "Show the red listening animation", GH_ParamAccess.item);
             pManager.AddBooleanParameter("Remember", "Save", "True = also keep these values as the defaults on this PC", GH_ParamAccess.item, false);
@@ -85,7 +85,7 @@ namespace Kakadoo
 
         public override GH_Exposure Exposure => GH_Exposure.primary;
 
-        protected override Bitmap Icon => Icons.Load("Kakadoo");
+        protected override Bitmap Icon => Icons.Load("KakadooSettings");
 
         public override Guid ComponentGuid => new Guid("c3a57e12-5b9d-4f08-9e6a-2d41b8f7a903");
     }
