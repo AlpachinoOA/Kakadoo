@@ -52,7 +52,9 @@ Connect a **Button** or **Boolean Toggle** to `Run`. Components start listening 
 * **Sliders with the same name change together.**
 * Values outside a slider's range are limited to it, and integer sliders get whole numbers.
 
-### Kakadoo Llama: the `Device` input
+### Kakadoo Llama: the `Description` and `Device` inputs
+
+`Description` (optional, also on Kakadoo GPT) tells the model what your script and goal are, e.g. *"a tower: Height is the number of floors"*. The better the description, the better the slider it picks.
 
 Type **`cpu`** or **`gpu`** (not case sensitive), optionally followed by `;` and the number of CPU cores to use,
 for example `gpu`, `cpu;6` or `GPU;4`. Leave it empty for the default (`cpu` on Windows, `gpu` on Mac).
@@ -126,7 +128,7 @@ in plain words under the component.
 **Requirements:** Rhino 8 for Windows (64-bit, a processor with AVX2) or Rhino 8 for Mac, and a microphone.
 
 1. Download the package for your system from the **Releases** page (or build it, see below):
-   `kakadoo-<version>-rh8_0-win.yak` or `kakadoo-<version>-rh8_0-mac.yak`.
+   `kakadoo-<version>-rh8_0-win.yak` or `kakadoo-<version>-rh8_0-mac.yak`. (Version 1.0.2.2 is Windows only; the latest Mac package is 1.0.2.1.)
 2. Install it with Rhino's Package Manager (`_PackageManager`) or `yak install`, then **restart Rhino**.
 3. In Grasshopper, open the **Kakadoo** tab. Run the **Kakadoo Checker** once. It downloads the speech model
    (a one-time download, shown with a progress bar) and reports anything that is missing.
