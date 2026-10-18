@@ -237,5 +237,5 @@ Kakadoo was developed at the Bauhaus-Universität Weimar and the City Intelligen
 
 ## License
 
-[MIT](LICENSE) © 2024 Alp Okan Atakan. Third-party software and models have their own licences, see
+[LGPL-3.0](LICENSE) © 2024 Alp Okan Atakan. Third-party software and models have their own licences, see
 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
