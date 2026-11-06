@@ -32,6 +32,12 @@ namespace Kakadoo
         /// </summary>
         public static byte[] RecordPhrase(int sampleRate, TimeSpan waitForSpeech, TimeSpan maxLength, CancellationToken token)
         {
+            // The start sound, muting the system audio and the stop sound (all optional, see the settings) belong around the recording.
+            using (RecordingSession.Begin()) return RecordPhraseCore(sampleRate, waitForSpeech, maxLength, token);
+        }
+
+        static byte[] RecordPhraseCore(int sampleRate, TimeSpan waitForSpeech, TimeSpan maxLength, CancellationToken token)
+        {
             var phrase = new MemoryStream();
             var preRoll = new Queue<byte[]>(); // keeps the moment before speech was detected so the first word isn't clipped
             var started = DateTime.UtcNow;

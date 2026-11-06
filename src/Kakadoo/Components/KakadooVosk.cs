@@ -30,7 +30,8 @@ namespace Kakadoo
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddNumberParameter("Sliders", "S", "Connect the sliders you want to manipulate", GH_ParamAccess.list);
-            pManager.AddTextParameter(VoskInputName, VoskInputName, "Path to the folder of the Vosk model", GH_ParamAccess.item);
+            pManager.AddTextParameter(VoskInputName, VoskInputName, "Path to the folder of the Vosk model. Optional: when empty, the Vosk model chosen in the Kakadoo Settings window is used", GH_ParamAccess.item);
+            pManager[1].Optional = true;
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
         }
 
@@ -45,6 +46,7 @@ namespace Kakadoo
             bool run = false;
             int pathIndex = Params.Input.FindIndex(p => p.Name == VoskInputName); // absent while Tether is on
             if (pathIndex >= 0) DA.GetData(pathIndex, ref modelPath);
+            if (string.IsNullOrWhiteSpace(modelPath)) modelPath = ModelSync.Get(ModelKind.Vosk);
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
@@ -82,7 +84,7 @@ namespace Kakadoo
                     command = await HearAsync(() =>
                     {
                         if (string.IsNullOrWhiteSpace(modelPath)) throw new SpeechSetupException("No Vosk model path provided. Connect the folder of a Vosk model.");
-                        return new VoskListener(modelPath).ListenOnceAsync(CancellationToken.None);
+                        return SpeechListeners.ListenAsync(new VoskListener(modelPath), m => Log(m));
                     });
                 }
                 catch (Exception e) { Log(ErrorHelp.Report(this, e)); return; }

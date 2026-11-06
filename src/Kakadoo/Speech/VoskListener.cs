@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -35,7 +35,7 @@ namespace Kakadoo
             return Task.Run(() =>
             {
                 string root = FindModelRoot(modelPath)
-                    ?? throw new DirectoryNotFoundException("No Vosk model found at " + modelPath + ". Please provide the folder that contains 'am' and 'conf'.");
+                    ?? throw new SpeechSetupException(MissingMessage(modelPath));
 
                 NativeResolver.Register();
                 var model = GetModel(root);
@@ -63,6 +63,15 @@ namespace Kakadoo
             if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return null;
             if (IsModelFolder(path)) return path;
             return Directory.GetDirectories(path).FirstOrDefault(IsModelFolder);
+        }
+
+        static string MissingMessage(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || ModelSync.SamePath(path, SpeechListeners.DefaultVoskModelPath()))
+                return "No Vosk model is installed. Open Kakadoo Settings > Models, download a Vosk model and press Use.";
+            return Directory.Exists(path)
+                ? "That is not a Vosk model folder (it needs 'am' and 'conf' inside): " + path
+                : "The Vosk model folder does not exist: " + path;
         }
 
         static bool IsModelFolder(string dir) =>

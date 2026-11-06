@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="assets/icon.png" alt="Kakadoo logo" width="120">
 </p>
 
@@ -26,25 +26,27 @@ All components are in the **Kakadoo** tab: the **Voice** panel (first), and a **
 |---|---|---|
 | **Kakadoo** | Say a slider's name and a number, e.g. "height 20" or "height twenty five". | Nothing else |
 | **Kakadoo Vosk** | Same as Kakadoo, fully offline with [Vosk](https://alphacephei.com/vosk/). Understands spoken numbers ("twenty five"). Can also be started by Always-On (Tether). | A Vosk model folder |
+| **Kakadoo Parakeet** | Same as Kakadoo, with NVIDIA's [Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) model. Fast and accurate on the CPU; v3 covers 25 European languages. Windows only. | A Parakeet model, downloaded in Kakadoo Settings |
+| **Kakadoo Custom** | Same as Kakadoo, with a Whisper-compatible model of your own (for example a fine-tuned one). | A `.bin` model, chosen in Kakadoo Settings |
 | **Kakadoo Llama** | Speak naturally, e.g. "make the building higher". A local Llama model picks the slider and the new value. Runs on CPU or GPU. | A Llama `.gguf` model file |
 | **Kakadoo GPT** | Same idea with OpenAI's GPT (model `gpt-4o-mini`). | An OpenAI API key and internet |
 | **Kakadoo Always-On** | Always listening. Say the catchphrase (default *"hey kakadoo"*) and then your command; the command is output as text. | Nothing else |
 | **Kakadoo Simple** | Listens once and outputs what you said as text. | Nothing else |
 | **Kakadoo Checker** | Tests your microphone, speech engine, models, cores and graphics card, and tells you what is missing. | Nothing else |
-| **Kakadoo Settings** | One optional place for shared settings: microphone, speech model, listening preset and the listening animation. | Nothing else |
+| **Kakadoo Settings** | One optional place for shared settings and models: right-click it to open a window with the microphone, listening preset, animation and a model manager (download Whisper, Vosk and Llama 2 models). | Nothing else |
 
 ### Inputs and outputs
 
 | Component | Inputs | Outputs |
 |---|---|---|
-| Kakadoo | `Sliders`, `Run`, `Whisper Model Path` (optional) | `Output` |
+| Kakadoo | `Sliders`, `Run`, `Speech Engine Path` (optional) | `Output` |
 | Kakadoo Vosk | `Sliders`, `Vosk Model Directory Path` (Vosk folder), `Run` | `Output` |
-| Kakadoo Llama | `Sliders`, `Llama Model Directory Path` (`.gguf` file), `Description` (optional), `Run`, `Device`, `Whisper Model Path` (optional) | `Output` |
-| Kakadoo GPT | `Sliders`, `API Key`, `Description`, `Run`, `Whisper Model Path` (optional) | `Output` |
-| Kakadoo Always-On | `Run`, `Whisper Model Path` (optional) | `Status`, `Text` |
-| Kakadoo Simple | `Run`, `Whisper Model Path` (optional) | `Output`, `Command` |
-| Kakadoo Checker | `Run`, `Whisper Model Path`, `Llama Model Directory Path`, `Vosk Model Directory Path` (all but `Run` optional) | `Output` |
-| Kakadoo Settings | `Microphone`, `Model`, `Preset`, `Animation`, `Remember` (all optional) | `Microphones`, `Active` |
+| Kakadoo Llama | `Sliders`, `Llama Model Directory Path` (`.gguf` file), `Description` (optional), `Run`, `Device`, `Speech Engine Path` (optional) | `Output` |
+| Kakadoo GPT | `Sliders`, `API Key`, `Description`, `Run`, `Speech Engine Path` (optional) | `Output` |
+| Kakadoo Always-On | `Run`, `Speech Engine Path` (optional) | `Status`, `Text` |
+| Kakadoo Simple | `Run`, `Speech Engine Path` (optional) | `Output`, `Command` |
+| Kakadoo Checker | `Run`, `Speech Engine Path`, `Llama Model Directory Path`, `Vosk Model Directory Path` (all but `Run` optional) | `Output` |
+| Kakadoo Settings | none (right-click to open the settings window) | none |
 
 Connect a **Button** or **Boolean Toggle** to `Run`. Components start listening when `Run` turns on.
 
@@ -70,24 +72,41 @@ The **Kakadoo Checker** shows how many cores your PC has and how many it recomme
 
 ### Kakadoo Settings
 
-Optional. Drop one into the document to change settings that every Kakadoo component shares. Leave an input empty to keep
-its current value. Only the first Settings component in a document counts.
+Optional, and it has no inputs or outputs. Drop one into the document, then right-click it (or double-click it) and choose
+**Open Kakadoo Settings**. The window applies and saves everything right away as the defaults on this PC (`~/Kakadoo/settings.txt`):
 
-| Input | Meaning |
-|---|---|
-| `Microphone` | The microphone to listen with: its name, or its number in the `Microphones` output (0 is the first). Empty uses the system default. Changing it takes effect at once. |
-| `Model` | `auto`, `fast` (smaller, quicker) or `accurate` (bigger, more precise). |
-| `Preset` | A bundle of listening settings: `standard`, `quiet` (quiet room, more sensitive), `noisy` (workshop, needs a louder voice), `fast` (quick replies, smaller model) or `accurate` (waits longer, bigger model). `Model`, if set, overrides the preset's model. |
-| `Animation` | Show or hide the red listening animation on all components. |
-| `Remember` | `true` also keeps these values as the defaults on this PC (`~/Kakadoo/settings.txt`). Otherwise they last for the Rhino session. |
+* **General**: sound (mute system audio while recording, start/stop sounds with their own output device and volume), custom words (misheard
+  word -> corrected spelling, also given to Whisper as hints), a trailing space for Simple and Always-On output, how many runs the components
+  keep (a component can still choose its own in its right-click menu), and whether Kakadoo Llama runs on the **CPU or GPU**. The device can
+  be changed between two commands without restarting Rhino; a Device input connected to the component still wins. Also: the microphone, the listening preset (`standard`, `quiet`, `noisy`, `fast`, `accurate`), the **speech language** and the listening animation.
+  The language is used by Whisper (choose a multilingual model, the ones without `.en`), Parakeet v3 and Kakadoo Custom. Vosk uses the
+  language of its own model. Spoken number words ("twenty five") are English only; digits work in every language.
+* **Models**: cards with accuracy and speed bars and an "Active" tag, in "Downloaded" and "Available to Download" lists with a language filter;
+  download, choose and delete speech models (Whisper tiny, base, small, medium in English or multilingual; Parakeet v2 and v3;
+  Vosk small), each with a tip on when to pick it, and Llama 2 chat models
+  (7B Q2_K, Q4_K_M, Q5_K_M and 13B Q4_K_M from TheBloke on Hugging Face), or point to your own file. **Kakadoo Llama** uses the
+  chosen Llama model when its model path input is empty.
+* **Custom models (experimental)**: copy a Whisper-compatible `.bin` file into `~/Kakadoo/custom-models` (or add a file from anywhere);
+  it is listed here and used by **Kakadoo Custom**.
+* **Checker**: the same checks as the Kakadoo Checker component, run from the window.
+* **About**: version, data folder and a link to email support (atakanalpokan@gmail.com).
+* A **Dark mode** switch at the bottom of the sidebar.
 
-The `Microphones` output lists the microphones found on this PC; `Active` shows what is in use.
+Every model is checked to run before it is accepted: after a download, when you press **Use**, and when you type a path into a panel
+(a model that does not run is refused and the panel goes back to the previous one). Whisper, Parakeet and custom models are loaded by
+their engine for this; Vosk and Llama files are checked by their contents, because loading a whole language model would take minutes.
+
+The chosen models are also written into a **panel** on each component's model path input (Whisper, Vosk, Llama, Parakeet or Custom) when nothing is
+connected there. Edit the panel and the setting changes for every component and in the window; choose another model in the window
+and the panels change. A panel or parameter you connected yourself is left alone. If the same model file is saved twice, the Models
+page offers to delete the extra copies.
+
+Documents saved with the older Settings component (with inputs) need a fresh Kakadoo Settings component.
 
 ### Always-On: Trigger and Tether
 
-A new **Kakadoo Always-On** has two inputs (`Run`, `Whisper Model Path`) and two outputs (`Status`, `Text`). `Status` shows the latest
-thing it heard or did. Right-click it to choose the speech engine (**Whisper**, the default, or **Vosk** for fully offline use with a Vosk model; the second
-input then becomes `Vosk Model Directory Path`) and one of two extras:
+A new **Kakadoo Always-On** has two inputs (`Run`, `Speech Engine Path`) and two outputs (`Status`, `Text`). `Status` shows the latest
+thing it heard or did. It uses the speech engine chosen in Kakadoo Settings > Models. Right-click it for one of two extras:
 
 * **Trigger**: adds a `Trigger` input (a list of words) and a `Hit` output. When one of the words is heard anywhere in a
   sentence, `Hit` is `true` for the *Trigger seconds* set in the same menu (default 5), then `false`. Use it to switch other
@@ -100,14 +119,13 @@ input then becomes `Vosk Model Directory Path`) and one of two extras:
   is not available.
 
 Only Always-On uses the microphone in a tethered setup, so components never compete for it. A tethered component no longer
-needs its `Whisper Model Path` / `Vosk Model Directory Path` input, so those inputs are hidden while Tether is on. This works the
+needs its `Speech Engine Path` / `Vosk Model Directory Path` input, so those inputs are hidden while Tether is on. This works the
 same for Kakadoo Vosk, so Vosk can run on its own or behind Always-On.
 
 ### Listening indicator
 
-While a component listens, a red ripple spreads out from its edge, stronger when the microphone hears more sound. Right-click
-a component and untick *Breathing animation* to turn it off for that component (a still red outline stays), or use the
-`Animation` input of Kakadoo Settings for all components. Errors, such as a blocked microphone or a failed download, are shown
+While a component listens, a red ripple spreads out from its edge, stronger when the microphone hears more sound. Turn *Breathing animation*
+off for all components in Kakadoo Settings (a still red outline stays). Errors, such as a blocked microphone or a failed download, are shown
 in plain words under the component.
 
 ### Right-click settings
@@ -119,8 +137,6 @@ in plain words under the component.
 | Trigger, Trigger seconds | Kakadoo Always-On | Adds the `Trigger` input and `Hit` output, and how long `Hit` stays true. |
 | Tether | Kakadoo Always-On | Adds the `Tether` output to start other Kakadoo components by voice. |
 | Tether input | Kakadoo, Vosk, Llama, GPT, Simple | Replaces `Run` and the Whisper/Vosk model path inputs with a `Tether` input (Always-On does the listening). |
-| Speech engine | Kakadoo Always-On | Switch between Whisper and Vosk. The model input becomes `Vosk Model Directory Path` while Vosk is selected. |
-| Breathing animation | All Kakadoo components | The red listening ripple on or off. |
 | GPU layers | Kakadoo Llama | `0` means as many as fit. |
 
 ---
@@ -130,7 +146,7 @@ in plain words under the component.
 **Requirements:** Rhino 8 for Windows (64-bit, a processor with AVX2) or Rhino 8 for Mac, and a microphone.
 
 1. Download the package for your system from the **Releases** page (or build it, see below):
-   `kakadoo-<version>-rh8_0-win.yak` or `kakadoo-<version>-rh8_0-mac.yak`. (Version 1.0.2.2 is Windows only; the latest Mac package is 1.0.2.1.)
+   `kakadoo-<version>-rh8_0-win.yak` or `kakadoo-<version>-rh8_0-mac.yak`. (Version 1.0.2.3 is Windows only; the latest Mac package is 1.0.2.1.)
 2. Install it with Rhino's Package Manager (`_PackageManager`) or `yak install`, then **restart Rhino**.
 3. In Grasshopper, open the **Kakadoo** tab. Run the **Kakadoo Checker** once. It downloads the speech model
    (a one-time download, shown with a progress bar) and reports anything that is missing.
@@ -156,7 +172,7 @@ Llama 13B answers in about 4 seconds on a GPU (about 22 seconds on 8 CPU cores).
 For offices where Rhino has no internet access, install the Whisper model by hand. Kakadoo looks for it in this order
 and uses the first one it finds:
 
-1. A path you set: the `Whisper Model Path` input of any component that listens with Whisper, or the `KAKADOO_WHISPER_MODEL`
+1. A path you set: the `Speech Engine Path` input of any component that listens with Whisper, or the `KAKADOO_WHISPER_MODEL`
    environment variable.
    The path can be a model file or a folder containing `ggml-*.bin` files.
 2. A `models` folder next to the plugin (handy for IT deployment).

@@ -49,6 +49,21 @@ namespace Kakadoo
         /// <summary>A model file or folder just for this listener. Blank uses the shared setting.</summary>
         public string ModelPath { get; set; }
 
+        /// <summary>Runs the model once on a second of silence. A file that loads but cannot compute (damaged, or a format the engine does not support) fails here.</summary>
+        public static void SelfTest(string modelFile)
+        {
+            try
+            {
+                var builder = GetFactory(modelFile).CreateBuilder()
+                    .WithThreads(Math.Max(1, Math.Min(4, Environment.ProcessorCount - 1)))
+                    .WithLanguage(WhisperModel.IsEnglishOnly(modelFile) ? "en" : "auto")
+                    .WithSingleSegment().WithNoContext();
+                using (var processor = builder.Build())
+                    Task.Run(async () => { await foreach (var _ in processor.ProcessAsync(new float[16000])) { } }).GetAwaiter().GetResult();
+            }
+            catch (Exception e) when (!(e is SpeechSetupException)) { throw new SpeechSetupException("The model loads but cannot run: " + Friendly(e), e); }
+        }
+
         /// <summary>Loads the engine ahead of time so the first command isn't slow. Throws <see cref="SpeechSetupException"/> if it can't start.</summary>
         public static void Warmup(string modelFile)
         {
@@ -68,6 +83,8 @@ namespace Kakadoo
             {
                 throw new SpeechSetupException(Friendly(e), e);
             }
+
+            WhisperModel.LanguageFor(modelFile); // fail early, before the microphone starts, if the model can't do the chosen language
 
             // Load the engine while the microphone listens, so the first phrase isn't delayed by the load.
             var loading = Task.Run(() => GetFactory(modelFile));
@@ -94,7 +111,7 @@ namespace Kakadoo
 
             var builder = GetFactory(modelFile).CreateBuilder()
                 .WithThreads(Math.Max(1, Math.Min(8, Environment.ProcessorCount - 1)))
-                .WithLanguage(WhisperModel.IsEnglishOnly(modelFile) ? "en" : "auto")
+                .WithLanguage(WhisperModel.LanguageFor(modelFile))
                 // Speed: a command is one short phrase, so skip the extras Whisper does for long recordings.
                 .WithSingleSegment()
                 .WithNoContext()
@@ -104,8 +121,11 @@ namespace Kakadoo
                 .WithMaxTokensPerSegment(Math.Min(224, 24 + (int)(samples.Length / (double)SampleRate * 8)))
                 // Whisper always processes 30 s of audio; only look at as much as was actually recorded (50 frames per second).
                 .WithAudioContextSize(Math.Min(1500, Math.Max(256, (int)(samples.Length / (double)SampleRate * 50) + 64)));
-            if (!string.IsNullOrWhiteSpace(Hint))
-                builder = builder.WithPrompt(Hint);
+            // The slider names and the custom words, so Whisper spells them the way they are written.
+            string prompt = string.Join(", ", new[] { Hint }.Concat(CustomWords.Targets()).Where(w => !string.IsNullOrWhiteSpace(w)));
+            if (prompt.Length > 400) prompt = prompt.Substring(0, 400);
+            if (prompt.Length > 0)
+                builder = builder.WithPrompt(prompt);
 
             var text = new StringBuilder();
             using (var processor = builder.Build())
@@ -175,8 +195,12 @@ namespace Kakadoo
         public static string Name =>
             EnvValue is string v && !LooksLikePath(v) ? v : PresetName ?? AutoName;
 
-        /// <summary>The model chosen with the Kakadoo Settings component, or null for automatic.</summary>
-        static string PresetName => Settings.ModelPreset == "fast" ? "base.en" : Settings.ModelPreset == "accurate" ? "small.en" : null;
+        /// <summary>The model chosen in the Kakadoo Settings window, or null for automatic.</summary>
+        static string PresetName => !string.IsNullOrWhiteSpace(Settings.WhisperModelName) ? Settings.WhisperModelName.Trim()
+            : Settings.ModelPreset == "fast" ? "base" + EnglishSuffix : Settings.ModelPreset == "accurate" ? "small" + EnglishSuffix : null;
+
+        /// <summary>English-only models (".en") are smaller and better, but only for English; other languages need the multilingual ones.</summary>
+        static string EnglishSuffix => Languages.IsEnglish ? ".en" : "";
 
         /// <summary>True when the user picked a specific model, so a different one must not be substituted.</summary>
         static bool Explicit => PresetName != null;
@@ -186,7 +210,7 @@ namespace Kakadoo
             get
             {
                 double ramGb = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1073741824.0;
-                return ramGb >= 8 && Environment.ProcessorCount >= 6 ? "small.en" : "base.en";
+                return (ramGb >= 8 && Environment.ProcessorCount >= 6 ? "small" : "base") + EnglishSuffix;
             }
         }
 
@@ -228,6 +252,17 @@ namespace Kakadoo
         public static bool IsEnglishOnly(string file) =>
             Path.GetFileName(file).IndexOf(".en", StringComparison.OrdinalIgnoreCase) >= 0;
 
+        /// <summary>The language to give Whisper for this model. Throws when the model is English only and another language is chosen.</summary>
+        public static string LanguageFor(string modelFile)
+        {
+            string lang = Settings.Language;
+            if (!IsEnglishOnly(modelFile)) return lang;
+            if (lang != "en" && lang != "auto")
+                throw new SpeechSetupException(Path.GetFileName(modelFile) + " understands English only, but the language is set to " + Languages.Name(lang)
+                    + ". Choose a multilingual Whisper model (without .en) in Kakadoo Settings > Models, or set the language to English.");
+            return "en";
+        }
+
         /// <summary>
         /// The model file to use without downloading anything, and where it came from; null if there isn't one.
         /// Throws <see cref="SpeechSetupException"/> if the user set a path that doesn't work.
@@ -263,11 +298,13 @@ namespace Kakadoo
         }
 
         /// <summary>Whisper models start with the bytes "lmgg" (the ggml magic number). Anything else would crash the engine or give garbage.</summary>
-        static void CheckIsModel(string file)
+        internal static void CheckIsModel(string file)
         {
             var magic = new byte[4];
             using (var stream = File.OpenRead(file))
-                if (stream.Read(magic, 0, 4) < 4 || Encoding.ASCII.GetString(magic) != "lmgg")
+                if (stream.Read(magic, 0, 4) >= 4 && Encoding.ASCII.GetString(magic) == "GGUF")
+                    throw new SpeechSetupException(Path.GetFileName(file) + " is a GGUF file, which is the format for Llama language models. Whisper-compatible models are ggml files (ggml-*.bin from huggingface.co/ggerganov/whisper.cpp).");
+                else if (Encoding.ASCII.GetString(magic) != "lmgg")
                     throw new SpeechSetupException(Path.GetFileName(file) + " is not a Whisper model (expected a ggml-*.bin file from huggingface.co/ggerganov/whisper.cpp).");
         }
 
@@ -275,11 +312,13 @@ namespace Kakadoo
         static string PickFrom(string folder)
         {
             string Path_(string n) => Path.Combine(folder, "ggml-" + n + ".bin");
-            foreach (var name in new[] { Name }.Concat(Preference))
+            // Another language than English must not end up with an English-only model.
+            bool Allowed(string n) => Languages.IsEnglish || n.IndexOf(".en", StringComparison.OrdinalIgnoreCase) < 0;
+            foreach (var name in new[] { Name }.Concat(Preference).Where(Allowed))
                 if (File.Exists(Path_(name))) return Path_(name);
 
-            return System.IO.Directory.GetFiles(folder, "ggml-*.bin").OrderBy(f => f).FirstOrDefault()
-                ?? System.IO.Directory.GetFiles(folder, "*.bin").OrderBy(f => f).FirstOrDefault();
+            return System.IO.Directory.GetFiles(folder, "ggml-*.bin").Where(f => Allowed(Path.GetFileName(f))).OrderBy(f => f).FirstOrDefault()
+                ?? System.IO.Directory.GetFiles(folder, "*.bin").Where(f => Allowed(Path.GetFileName(f))).OrderBy(f => f).FirstOrDefault();
         }
 
         /// <summary>The instructions for installing the model by hand, for when downloading isn't possible.</summary>
@@ -300,38 +339,14 @@ namespace Kakadoo
 
                 System.IO.Directory.CreateDirectory(Directory);
                 string target = FilePath;
-                string temp = target + ".download";
 
                 try
                 {
                     ModelDownload.Start("Downloading Whisper model '" + Name + "' (once)", Directory);
-                    using (var http = new HttpClient(new HttpClientHandler { UseProxy = true, DefaultProxyCredentials = System.Net.CredentialCache.DefaultCredentials }) { Timeout = TimeSpan.FromMinutes(30) })
-                    using (var response = http.GetAsync(DownloadUrl, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult())
-                    {
-                        response.EnsureSuccessStatusCode();
-                        long total = response.Content.Headers.ContentLength ?? 0;
-                        using (var source = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                        using (var file = File.Create(temp))
-                        {
-                            var buffer = new byte[81920];
-                            long done = 0;
-                            int read;
-                            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
-                            {
-                                file.Write(buffer, 0, read);
-                                done += read;
-                                ModelDownload.Report(done, total);
-                            }
-                            if (total > 0 && done != total)
-                                throw new IOException("the download was cut off (" + done / 1048576 + " of " + total / 1048576 + " MB)");
-                        }
-                    }
-                    CheckIsModel(temp); // a cut-off download or an error page would not be a model
-                    File.Move(temp, target);
+                    ModelFiles.Download(DownloadUrl, target, ModelDownload.Report, CancellationToken.None, CheckIsModel);
                 }
                 catch (Exception e)
                 {
-                    if (File.Exists(temp)) File.Delete(temp);
                     throw new SpeechSetupException("Could not download the Whisper model '" + Name + "' (" + e.Message + "). " + ManualInstallHelp, e);
                 }
                 finally

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +17,10 @@ namespace Kakadoo
     {
         readonly List<List<string>> runs = new List<List<string>>(); // oldest first
 
-        public int Limit { get; set; } = 4;
+        /// <summary>This component's own limit, or null to follow the global one from the Kakadoo Settings window.</summary>
+        public int? Override { get; set; }
+
+        public int Limit { get => Override ?? Settings.HistoryLimit; set => Override = value; }
 
         public bool IsEmpty { get { lock (runs) return runs.Count == 0; } }
 
@@ -85,7 +88,7 @@ namespace Kakadoo
         // Run and the speech-model inputs are not needed (and get in the way) when the component is started by voice from
         // Always-On, which does the listening, so they are swapped out for the Tether input.
         readonly List<KeyValuePair<int, IGH_Param>> removedInputs = new List<KeyValuePair<int, IGH_Param>>();
-        static bool GoesWithTether(IGH_Param p) => p.Name == "Run" || p.Name == WhisperInputName || p.Name == VoskInputName;
+        static bool GoesWithTether(IGH_Param p) => p.Name == "Run" || p.Name == WhisperInputName || p.Name == VoskInputName || p.Name == ParakeetInputName || p.Name == CustomInputName;
 
         /// <summary>Index of the Run input, or -1 while it is swapped out for the Tether input.</summary>
         protected int RunIndex => Params.Input.FindIndex(p => p.Name == "Run");
@@ -130,17 +133,42 @@ namespace Kakadoo
                     tether.Attributes = new TetherAttributes(tether, Attributes);
         }
 
+        ModelPanelSync modelSync;
+
         public override void AddedToDocument(GH_Document document)
         {
             base.AddedToDocument(document);
             EnsureTetherAttributes();
+            if (modelSync == null) modelSync = new ModelPanelSync(this) { ChecksEngine = FollowsEngine };
+            modelSync.Attach();
+            Settings.Changed += OnGlobalSettingsChanged;
+        }
+
+        /// <summary>The global history limit changed: keep fewer runs right away, and redraw.</summary>
+        void OnGlobalSettingsChanged()
+        {
+            if (messages.Override != null) return;
+            messages.Trim();
+            RequestRefresh();
+        }
+
+        public override void RemovedFromDocument(GH_Document document)
+        {
+            modelSync?.Detach();
+            Settings.Changed -= OnGlobalSettingsChanged;
+            base.RemovedFromDocument(document);
         }
 
         protected override void BeforeSolveInstance()
         {
             base.BeforeSolveInstance();
             EnsureTetherAttributes();
+            try { modelSync?.BeforeSolve(); }
+            catch (Exception e) { AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Could not sync the model setting: " + e.Message); }
         }
+
+        /// <summary>True for the components that listen with the engine chosen in the settings; they turn orange when it is not ready.</summary>
+        protected virtual bool FollowsEngine => false;
 
         /// <summary>Called by Always-On on the UI thread. Returns false if this component doesn't take tether signals.</summary>
         public bool Tether(string text)
@@ -202,7 +230,7 @@ namespace Kakadoo
         protected override void AppendAdditionalComponentMenuItems(ToolStripDropDown menu)
         {
             base.AppendAdditionalComponentMenuItems(menu);
-            Menu_AppendItem(menu, "Keep last runs:", null, false);
+            Menu_AppendItem(menu, "Keep last runs (" + (messages.Override == null ? "global setting" : "this component") + "):", null, false);
             Menu_AppendTextItem(menu, messages.Limit.ToString(), null, (box, text) =>
             {
                 if (int.TryParse(text, out int limit) && limit >= 1 && limit <= 100)
@@ -212,6 +240,8 @@ namespace Kakadoo
                     ExpireSolution(true);
                 }
             }, true);
+            if (messages.Override != null)
+                Menu_AppendItem(menu, "Follow the global setting again", (s, e) => { messages.Override = null; messages.Trim(); ExpireSolution(true); });
 
             if (SupportsTether)
                 Menu_AppendItem(menu, "Tether input (start by voice from Always-On)", (s, e) =>
@@ -223,14 +253,17 @@ namespace Kakadoo
             ProgressAttributes.AppendMenu(menu, this);
         }
 
-        public const string WhisperInputName = "Whisper Model Path";
+        public const string WhisperInputName = "Speech Engine Path";
         public const string VoskInputName = "Vosk Model Directory Path";
+        public const string LlamaInputName = "Llama Model Directory Path";
+        public const string ParakeetInputName = "Parakeet Model Path";
+        public const string CustomInputName = "Custom Model Path";
 
         /// <summary>Adds the optional "Whisper Model Path" input, shared by every component that listens with Whisper.</summary>
         protected static void AddWhisperInput(GH_InputParamManager pManager)
         {
             int i = pManager.AddTextParameter(WhisperInputName, WhisperInputName,
-                "Optional: a Whisper model file (ggml-*.bin) or a folder containing one, for PCs without internet. Blank uses the automatic model.", GH_ParamAccess.item);
+                "Optional: the model file or folder of the speech engine chosen in Kakadoo Settings > Models (a Whisper ggml-*.bin file, a Parakeet folder...). Blank uses the model chosen there.", GH_ParamAccess.item);
             pManager[i].Optional = true;
         }
 
@@ -245,20 +278,18 @@ namespace Kakadoo
 
         public override bool Write(GH_IWriter writer)
         {
-            writer.SetInt32("HistoryLimit", messages.Limit);
+            if (messages.Override.HasValue) writer.SetInt32("HistoryLimitOverride", messages.Override.Value);
             writer.SetBoolean("TetherOn", TetherOn);
-            ProgressAttributes.Write(this, writer);
             return base.Write(writer);
         }
 
         public override bool Read(GH_IReader reader)
         {
             int limit = 4;
-            if (reader.TryGetInt32("HistoryLimit", ref limit)) messages.Limit = Math.Max(1, limit);
+            if (reader.TryGetInt32("HistoryLimitOverride", ref limit)) messages.Override = Math.Max(1, limit);
             // The Tether input is created before the base class reads the saved parameters, so the counts match.
             bool tether = false;
             if (SupportsTether && reader.TryGetBoolean("TetherOn", ref tether) && tether) SetTether(true);
-            ProgressAttributes.Read(this, reader);
             return base.Read(reader);
         }
     }

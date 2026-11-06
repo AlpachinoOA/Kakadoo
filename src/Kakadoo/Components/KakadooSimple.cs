@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -66,7 +66,7 @@ namespace Kakadoo
             lock (gate)
             {
                 DA.SetDataList(0, messages.ToList());
-                DA.SetData(1, command);
+                DA.SetData(1, Settings.AppendTrailingSpace && !string.IsNullOrEmpty(command) ? command + " " : command);
             }
         }
 
@@ -106,6 +106,8 @@ namespace Kakadoo
         }
 
         protected override Bitmap Icon => Icons.Load("KakadooSimple");
+
+        protected override bool FollowsEngine => true;
 
         public override GH_Exposure Exposure => GH_Exposure.primary;
 

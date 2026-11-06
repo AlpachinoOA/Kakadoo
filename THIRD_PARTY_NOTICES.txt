@@ -12,6 +12,12 @@ This package includes the following open-source software. Each is used under its
   https://github.com/SciSharp/LLamaSharp  https://github.com/ggerganov/llama.cpp
 - Vosk (offline speech recognition)                     Apache License 2.0
   https://github.com/alphacep/vosk-api
+- sherpa-onnx and ONNX Runtime (runs the Parakeet models)  Apache License 2.0 / MIT licence
+  https://github.com/k2-fsa/sherpa-onnx  https://github.com/microsoft/onnxruntime
+- NVIDIA Parakeet models (downloaded on request)        CC-BY-4.0 licence, (c) NVIDIA
+  https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2  https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+- Llama 2 Chat models (downloaded on request, GGUF files by TheBloke)   Llama 2 Community Licence, (c) Meta
+  https://ai.meta.com/llama/license/  https://huggingface.co/TheBloke
 - NAudio (microphone recording on Windows)              MIT licence
   https://github.com/naudio/NAudio
 - OpenTK (microphone recording on Mac)                  MIT licence

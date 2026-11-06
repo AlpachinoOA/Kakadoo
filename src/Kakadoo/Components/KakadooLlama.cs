@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -48,7 +48,8 @@ namespace Kakadoo
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
             pManager.AddNumberParameter("Sliders", "S", "Connect the sliders you want to manipulate", GH_ParamAccess.list);
-            pManager.AddTextParameter("Llama Model Directory Path", "Llama Model Directory Path", "Path to the Llama GGUF model file", GH_ParamAccess.item);
+            pManager.AddTextParameter(LlamaInputName, LlamaInputName, "Path to the Llama GGUF model file. Optional: when empty, the model chosen in the Kakadoo Settings window is used", GH_ParamAccess.item);
+            pManager[1].Optional = true;
             int d = pManager.AddTextParameter("Description", "D", "Optional: a brief description of the script and your goal, given to the model as context, e.g. \"a tower: Height is the number of floors\"", GH_ParamAccess.item, "");
             pManager[d].Optional = true;
             pManager.AddBooleanParameter("Run", "R", "Connect a button", GH_ParamAccess.item, false);
@@ -67,6 +68,7 @@ namespace Kakadoo
             string modelPath = null, device = null;
             bool run = false;
             DA.GetData(1, ref modelPath);
+            if (string.IsNullOrWhiteSpace(modelPath)) modelPath = Settings.LlamaModelPath;
             if (RunIndex >= 0) DA.GetData(RunIndex, ref run);
             ApplyWhisperInput(DA, listener);
             string description = "";
@@ -74,6 +76,8 @@ namespace Kakadoo
             if (descIndex >= 0) DA.GetData(descIndex, ref description);
             int deviceIndex = Params.Input.FindIndex(p => p.Name == "Device");
             if (deviceIndex >= 0) DA.GetData(deviceIndex, ref device);
+            // Without a Device input connected, the choice in the Kakadoo Settings window decides (cpu or gpu), and it applies to the next command.
+            if (deviceIndex < 0 || Params.Input[deviceIndex].SourceCount == 0) device = Settings.Device;
 
             // Only trigger on the rising edge so re-solves (e.g. after a slider change) don't relisten.
             bool woken = ConsumeTether(!running);
@@ -176,18 +180,12 @@ namespace Kakadoo
             }
 
             bool gpu = UseGpu;
-            if (!LlamaNative.Register(gpu) && !LlamaNative.LibrariesFound)
+            if (!LlamaNative.Register())
             {
                 Log("The llama.cpp libraries were not found in the plugin folder. Reinstall the Kakadoo package.");
                 return false;
             }
-            else if (!LlamaNative.Register(gpu))
-            {
-                // llama.cpp can't be swapped once loaded, so the other version needs a fresh Rhino session.
-                gpu = LlamaNative.IsGpuBuild;
-                Log("The " + (gpu ? "GPU" : "CPU") + " version of llama.cpp is already loaded in this Rhino session. Restart Rhino to switch.");
-            }
-            else if (gpu && !LlamaNative.IsGpuBuild)
+            if (gpu && !LlamaNative.IsGpuBuild)
             {
                 gpu = false;
                 Log("GPU support is not available on this system, using the CPU.");
@@ -354,6 +352,8 @@ namespace Kakadoo
         }
 
         protected override Bitmap Icon => Icons.Load("KakadooLlama");
+
+        protected override bool FollowsEngine => true;
 
         public override GH_Exposure Exposure => GH_Exposure.primary;
 

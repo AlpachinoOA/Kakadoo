@@ -21,6 +21,10 @@ namespace Kakadoo
                     : "Access was denied. Allow microphone access for desktop apps in your system privacy settings, then run again.";
             if (e is HttpRequestException || e is WebException)
                 return "The model could not be downloaded. Check your internet connection, or put the model file in " + WhisperModelFolder + " (or set its path in the right-click menu).";
+            if (e is FileNotFoundException || e is DirectoryNotFoundException)
+                return "A model file or folder is missing (" + e.Message + "). Open Kakadoo Settings > Models and choose or download one.";
+            if (e is NAudio.MmException || e is System.Runtime.InteropServices.COMException)
+                return "The microphone could not be used (" + e.Message + "). Check that it is plugged in, not used by another app, and chosen in Kakadoo Settings > General.";
             if (e is OutOfMemoryException)
                 return "Not enough memory for this model. Set Model to \"fast\" in Kakadoo Settings.";
             if (e is IOException && e.Message.IndexOf("space", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -29,7 +33,7 @@ namespace Kakadoo
                 return Hardware.IsMac
                     ? "A required library was blocked by macOS (" + e.Message + "). In Terminal run: xattr -dr com.apple.quarantine <Kakadoo plugin folder> and restart Rhino. See the README for the full commands."
                     : "A required library could not be loaded (" + e.Message + "). Reinstall Kakadoo and the Microsoft Visual C++ Redistributable (x64).";
-            return e.Message;
+            return e.Message + " (Run the Kakadoo Checker, or the Checker tab in Kakadoo Settings, to find the cause.)";
         }
 
         static string WhisperModelFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Kakadoo", "models");

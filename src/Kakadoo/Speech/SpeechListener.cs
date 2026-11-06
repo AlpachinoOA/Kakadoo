@@ -19,12 +19,45 @@ namespace Kakadoo
 
     public class SystemSpeechListener : ISpeechListener
     {
+        readonly bool strict;
+
+        /// <param name="strict">True when the user chose Windows speech: a language that is not installed is an error. False (the backup engine) uses any installed language.</param>
+        public SystemSpeechListener(bool strict = false) { this.strict = strict; }
+
+        static System.Collections.Generic.List<CultureInfo> Installed() =>
+            SpeechRecognitionEngine.InstalledRecognizers().Select(r => r.Culture).ToList();
+
+        /// <summary>Why Windows speech cannot listen in the language chosen in the settings, or null when it can.</summary>
+        public static string LanguageProblem()
+        {
+            try
+            {
+                var installed = Installed();
+                if (installed.Count == 0)
+                    return "No Windows speech language is installed. Add one in Windows settings > Time & language > Language & region (keep its speech option ticked), or choose another speech engine.";
+                string code = Settings.Language;
+                if (code == "auto" || installed.Any(c => c.TwoLetterISOLanguageName == code)) return null;
+                return "Windows speech recognition has no " + Languages.Name(code) + " installed (installed: " + string.Join(", ", installed.Select(c => c.EnglishName)) + "). "
+                    + "Add it in Windows settings > Time & language > Language & region, or pick another speech engine or language in Kakadoo Settings > Models.";
+            }
+            catch (Exception) { return null; }
+        }
+
         /// <summary>
         /// The installed recognizer closest to the user's language: same language first, then English, then any.
         /// Windows only has recognizers for the speech languages installed in its settings, which often isn't the UI language.
         /// </summary>
-        static CultureInfo PickRecognizer()
+        CultureInfo PickRecognizer()
         {
+            if (strict && LanguageProblem() is string problem) throw new SpeechSetupException(problem);
+            string wanted = Settings.Language;
+            if (strict && wanted != "auto")
+            {
+                var all = Installed();
+                return all.FirstOrDefault(c => c.Name == CultureInfo.CurrentUICulture.Name && c.TwoLetterISOLanguageName == wanted)
+                    ?? all.First(c => c.TwoLetterISOLanguageName == wanted);
+            }
+
             var installed = SpeechRecognitionEngine.InstalledRecognizers().Select(r => r.Culture).ToList();
             if (installed.Count == 0)
                 throw new SpeechSetupException("No speech recognizer is installed. Add a speech language in Windows Settings > Time & language > Speech.");
@@ -64,16 +97,16 @@ namespace Kakadoo
         /// (when a Vosk model is installed). Set KAKADOO_ENGINE to whisper, system (Windows) or vosk to use just one.
         /// Nothing is loaded until the first command, so creating this never fails.
         /// </summary>
-        public static ISpeechListener Create()
+        public static ISpeechListener Create(bool phrases = false)
         {
             string choice = Environment.GetEnvironmentVariable("KAKADOO_ENGINE")?.Trim().ToLowerInvariant();
             var chain = new FallbackListener();
 
             bool whisper = choice == null || choice == "whisper" || choice == "";
-            if (whisper) chain.Add("Whisper", () => new WhisperListener());
+            if (whisper) chain.Add("Whisper", () => new EngineListener { Phrases = phrases });
 
             if (choice == "system" || (whisper && choice == null && IsWindows))
-                chain.Add("Windows speech recognition", CreateWindows);
+                chain.Add("Windows speech recognition", () => CreateWindows());
 
             if (choice == "vosk" || (whisper && choice == null && !IsWindows && VoskListener.FindModelRoot(DefaultVoskModelPath()) != null))
                 chain.Add("Vosk", () => new VoskListener(DefaultVoskModelPath()));
@@ -86,7 +119,7 @@ namespace Kakadoo
         {
             try
             {
-                return await listener.ListenOnceAsync(token);
+                return CustomWords.Apply(await listener.ListenOnceAsync(token));
             }
             finally
             {
@@ -108,13 +141,14 @@ namespace Kakadoo
 
         // Kept separate so System.Speech is never loaded on Mac.
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static ISpeechListener CreateWindows() => new SystemSpeechListener();
+        internal static ISpeechListener CreateWindows(bool strict = false) => new SystemSpeechListener(strict);
 
         /// <summary>KAKADOO_VOSK_MODEL, else "vosk-model" next to the plugin, else ~/Kakadoo/vosk-model.</summary>
         public static string DefaultVoskModelPath()
         {
             string env = Environment.GetEnvironmentVariable("KAKADOO_VOSK_MODEL");
             if (!string.IsNullOrWhiteSpace(env)) return env;
+            if (!string.IsNullOrWhiteSpace(Settings.VoskModelPath)) return Settings.VoskModelPath;
 
             string beside = Path.Combine(Path.GetDirectoryName(typeof(SpeechListeners).Assembly.Location), "vosk-model");
             if (Directory.Exists(beside)) return beside;

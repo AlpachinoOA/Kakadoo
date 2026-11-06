@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -121,6 +121,8 @@ namespace Kakadoo
         }
 
         protected override Bitmap Icon => Icons.Load("Kakadoo");
+
+        protected override bool FollowsEngine => true;
 
         public override GH_Exposure Exposure => GH_Exposure.primary;
 

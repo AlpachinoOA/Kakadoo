@@ -13,7 +13,7 @@ namespace Kakadoo
 {
     /// <summary>
     /// Component look that adds a download bar underneath while the speech model is downloading
-    /// and the component is the one waiting for it. While listening it also draws a breathing ring (switchable per component).
+    /// and the component is the one waiting for it. While listening it also draws a breathing ring (switched in Kakadoo Settings).
     /// </summary>
     class ProgressAttributes : GH_ComponentAttributes
     {
@@ -26,8 +26,6 @@ namespace Kakadoo
         static readonly Dictionary<ProgressAttributes, long> active = new Dictionary<ProgressAttributes, long>();
         static Timer timer;
 
-        /// <summary>Whether the listening ring breathes. Saved with the component.</summary>
-        public bool Animate { get; set; } = true;
 
         public ProgressAttributes(IGH_Component owner) : base(owner)
         {
@@ -135,7 +133,7 @@ namespace Kakadoo
         public static void Pulse(GH_Component owner)
         {
             var attributes = owner.Attributes as ProgressAttributes;
-            if (attributes == null || !(attributes.Animate && Settings.Animate)) return;
+            if (attributes == null || !Settings.Animate) return;
             attributes.pulseStart = Environment.TickCount64;
             attributes.Register();
             Grasshopper.Instances.RedrawCanvas();
@@ -156,7 +154,7 @@ namespace Kakadoo
                 return;
             }
 
-            bool animate = Animate && Settings.Animate;
+            bool animate = Settings.Animate;
             if (animate) Register(); else Unregister();
 
             var smoothing = graphics.SmoothingMode;
@@ -245,7 +243,7 @@ namespace Kakadoo
             foreach (var pair in active)
             {
                 var a = pair.Key;
-                if (!(a.Animate && Settings.Animate) || !(a.IsListening || a.PulseActive) || a.Owner.OnPingDocument() == null || now - pair.Value > StaleMs)
+                if (!Settings.Animate || !(a.IsListening || a.PulseActive) || a.Owner.OnPingDocument() == null || now - pair.Value > StaleMs)
                     (drop ?? (drop = new List<ProgressAttributes>())).Add(a);
                 else redraw = true;
             }
@@ -254,7 +252,7 @@ namespace Kakadoo
             StopTimerIfIdle();
         }
 
-        /// <summary>Adds the "Breathing animation" toggle to a component's menu.</summary>
+        /// <summary>Adds the fast-model shortcut to a component's menu.</summary>
         public static void AppendMenu(ToolStripDropDown menu, GH_Component owner)
         {
             var attributes = owner.Attributes as ProgressAttributes;
@@ -265,24 +263,6 @@ namespace Kakadoo
                     Settings.Apply(null, "fast", null, null, false);
                     ShowNote(owner, "The fast model will be used the next time you start listening.", NoteKind.Hint, 8);
                 });
-            GH_DocumentObject.Menu_AppendItem(menu, "Breathing animation", (s, e) =>
-            {
-                attributes.Animate = !attributes.Animate;
-                Grasshopper.Instances.RedrawCanvas();
-            }, true, attributes.Animate);
-        }
-
-        public static void Write(GH_Component owner, GH_IWriter writer)
-        {
-            var attributes = owner.Attributes as ProgressAttributes;
-            if (attributes != null) writer.SetBoolean("Animate", attributes.Animate);
-        }
-
-        public static void Read(GH_Component owner, GH_IReader reader)
-        {
-            bool animate = true;
-            var attributes = owner.Attributes as ProgressAttributes;
-            if (attributes != null && reader.TryGetBoolean("Animate", ref animate)) attributes.Animate = animate;
         }
     }
 }

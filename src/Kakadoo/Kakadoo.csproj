@@ -20,7 +20,7 @@
   
   <PropertyGroup>
     <!-- Specifies information for Assembly and Yak -->
-    <Version>1.0</Version>
+    <Version>1.0.2.3</Version>
     <Title>Kakadoo</Title>
     <Company>Alp Okan Atakan</Company>
     <Copyright>Copyright (c) 2024 Alp Okan Atakan</Copyright>
@@ -34,8 +34,10 @@
     <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.27.0" />
     <PackageReference Include="NAudio.Core" Version="2.2.1" />
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" ExcludeAssets="runtime" />
     <PackageReference Include="Vosk" Version="0.3.38" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="2.0.1" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
@@ -86,7 +88,7 @@
   <!-- Keep only the native libraries for the platform each build is for (Windows x64, or Mac) -->
   <Target Name="TrimRuntimes" AfterTargets="Build">
     <ItemGroup>
-      <UnwantedRuntime Include="$(OutDir)runtimes/linux-x64;$(OutDir)runtimes/linux-arm64;$(OutDir)runtimes/linux-musl-x64;$(OutDir)runtimes/win-arm64;$(OutDir)runtimes/win-x86;$(OutDir)runtimes/linux-arm;$(OutDir)runtimes/win-x64/native/avx512" />
+      <UnwantedRuntime Include="$(OutDir)runtimes/linux-x64;$(OutDir)runtimes/linux-arm64;$(OutDir)runtimes/linux-musl-x64;$(OutDir)runtimes/win-arm64;$(OutDir)runtimes/win-x86;$(OutDir)runtimes/linux-arm;$(OutDir)runtimes/android-arm64;$(OutDir)runtimes/android-x64;$(OutDir)runtimes/android-arm;$(OutDir)runtimes/android-x86;$(OutDir)runtimes/ios-arm64;$(OutDir)runtimes/iossimulator-arm64;$(OutDir)runtimes/iossimulator-x64;$(OutDir)runtimes/win-x64/native/avx512" />
       <UnwantedRuntime Include="$(OutDir)runtimes/osx;$(OutDir)runtimes/osx-x64;$(OutDir)runtimes/osx-arm64;$(OutDir)runtimes/macos-arm64;$(OutDir)runtimes/macos-x64" Condition="$(TargetFramework.Contains('-windows'))" />
       <UnwantedRuntime Include="$(OutDir)runtimes/win-x64;$(OutDir)runtimes/win" Condition="!$(TargetFramework.Contains('-windows'))" />
     </ItemGroup>
@@ -134,11 +136,11 @@
     <Copy SourceFiles="$(MSBuildProjectDirectory)/../../assets/icon.png" DestinationFolder="$(OutputPath)yak-mac" />
 
     <WriteLinesToFile File="$(OutputPath)yak-win/manifest.yml" Overwrite="true" Condition="$(BuildYakPackage) == 'True'"
-                      Lines="name: kakadoo;version: 1.0.2.2;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
+                      Lines="name: kakadoo;version: 1.0.2.3;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
     <Exec Command="&quot;$(YakExecutable)&quot; build --platform win" WorkingDirectory="$(OutputPath)yak-win" Condition="$(BuildYakPackage) == 'True'" />
 
     <WriteLinesToFile File="$(OutputPath)yak-mac/manifest.yml" Overwrite="true" Condition="$(BuildYakPackage) == 'True'"
-                      Lines="name: kakadoo;version: 1.0.2.2;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
+                      Lines="name: kakadoo;version: 1.0.2.3;authors:;- Alp Okan Atakan;description: Manipulate sliders with your voice! Offline speech recognition (Whisper) and local LLMs (Llama) for Grasshopper.;keywords:;- voice;- speech;- sliders;- llm;- whisper;icon: icon.png" />
     <Exec Command="&quot;$(YakExecutable)&quot; build --platform mac" WorkingDirectory="$(OutputPath)yak-mac" Condition="$(BuildYakPackage) == 'True'" />
 
     <ItemGroup>

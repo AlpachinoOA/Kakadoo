@@ -15,20 +15,25 @@ namespace Kakadoo
         /// <summary>True if the loaded llama.cpp build uses the GPU (Vulkan on Windows, Metal on Mac).</summary>
         public static bool IsGpuBuild { get; private set; }
 
+        /// <summary>True when this PC has a graphics card the GPU build of llama.cpp can use (Vulkan on Windows, Metal on Mac).</summary>
+        public static bool GpuAvailable =>
+            RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || (FindNativeDirectory(true) is string dir && dir.EndsWith("vulkan") && VideoMemory.DetectBytes() > 0);
+
         /// <summary>False if the llama.cpp libraries are missing from the plugin folder.</summary>
         public static bool LibrariesFound { get; private set; } = true;
 
         /// <summary>
-        /// Loads llama.cpp. Native libraries can't be swapped inside a running process, so the first call decides
-        /// between the CPU and GPU build. Returns false if a later call asks for the other one.
+        /// Loads llama.cpp once. Native libraries can't be swapped inside a running process, so on a PC with a usable graphics card the GPU build
+        /// (Vulkan on Windows, Metal on Mac) is loaded, and the CPU is then simply "0 layers on the GPU". That way the device can change between
+        /// two commands without restarting Rhino. Returns false if the libraries are missing from the plugin folder.
         /// </summary>
-        public static bool Register(bool wantGpu)
+        public static bool Register()
         {
-            if (registered) return IsGpuBuild == wantGpu || RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+            if (registered) return LibrariesFound;
             registered = true;
             MacTrust.Prepare();
 
-            string dir = FindNativeDirectory(wantGpu);
+            string dir = FindNativeDirectory(GpuAvailable);
             LibrariesFound = dir != null;
             if (dir == null) return false;
 
