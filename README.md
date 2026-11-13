@@ -86,7 +86,7 @@ Optional, and it has no inputs or outputs. Drop one into the document, then righ
   Vosk small), each with a tip on when to pick it, and Llama 2 chat models
   (7B Q2_K, Q4_K_M, Q5_K_M and 13B Q4_K_M from TheBloke on Hugging Face), or point to your own file. **Kakadoo Llama** uses the
   chosen Llama model when its model path input is empty.
-* **Custom models (experimental)**: copy a Whisper-compatible `.bin` file into `~/Kakadoo/custom-models` (or add a file from anywhere);
+* **Custom models (experimental)**: copy a Whisper-compatible `.bin` file into `~/Kakadoo/models/custom-models` (or add a file from anywhere);
   it is listed here and used by **Kakadoo Custom**.
 * **Checker**: the same checks as the Kakadoo Checker component, run from the window.
 * **About**: version, data folder and a link to email support (atakanalpokan@gmail.com).
@@ -146,7 +146,7 @@ in plain words under the component.
 **Requirements:** Rhino 8 for Windows (64-bit, a processor with AVX2) or Rhino 8 for Mac, and a microphone.
 
 1. Download the package for your system from the **Releases** page (or build it, see below):
-   `kakadoo-<version>-rh8_0-win.yak` or `kakadoo-<version>-rh8_0-mac.yak`. (Version 1.0.2.3 is Windows only; the latest Mac package is 1.0.2.1.)
+   `kakadoo-<version>-rh8_0-win.yak` or `kakadoo-<version>-rh8_0-mac.yak`. (Version 1.0.2.4 is Windows only; the latest Mac package is 1.0.2.1.)
 2. Install it with Rhino's Package Manager (`_PackageManager`) or `yak install`, then **restart Rhino**.
 3. In Grasshopper, open the **Kakadoo** tab. Run the **Kakadoo Checker** once. It downloads the speech model
    (a one-time download, shown with a progress bar) and reports anything that is missing.

@@ -153,7 +153,7 @@ namespace Kakadoo
             string beside = Path.Combine(Path.GetDirectoryName(typeof(SpeechListeners).Assembly.Location), "vosk-model");
             if (Directory.Exists(beside)) return beside;
 
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Kakadoo", "vosk-model");
+            return ModelCatalog.VoskFolder;
         }
     }
 }

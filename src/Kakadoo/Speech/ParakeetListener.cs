@@ -15,7 +15,7 @@ namespace Kakadoo
     static class ParakeetModel
     {
         public static string Folder =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Kakadoo", "parakeet");
+            Path.Combine(ModelCatalog.ModelsRoot, "parakeet");
 
         public static string FolderFor(string id) => Path.Combine(Folder, id);
 

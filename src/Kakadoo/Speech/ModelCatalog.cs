@@ -179,6 +179,28 @@ namespace Kakadoo
 
         public static string Folder => Root;
 
+        /// <summary>Every downloaded model lives under this folder: ~/Kakadoo/models.</summary>
+        public static string ModelsRoot => Path.Combine(Root, "models");
+
+        /// <summary>Moves model folders from older versions into ModelsRoot; returns the old-to-new path pairs that were moved.</summary>
+        public static List<KeyValuePair<string, string>> MigrateOldFolders()
+        {
+            var moved = new List<KeyValuePair<string, string>>();
+            foreach (var name in new[] { "parakeet", "vosk-model", "vosk-models", "llama", "custom-models" })
+            {
+                string from = Path.Combine(Root, name), to = Path.Combine(ModelsRoot, name);
+                try
+                {
+                    if (!Directory.Exists(from) || Directory.Exists(to)) continue;
+                    Directory.CreateDirectory(ModelsRoot);
+                    Directory.Move(from, to);
+                    moved.Add(new KeyValuePair<string, string>(from, to));
+                }
+                catch (Exception) { }
+            }
+            return moved;
+        }
+
         public static readonly string[] Families = { "Whisper", "Parakeet", "Vosk", "Llama 2", "Custom" };
 
         public static string FamilyNote(string family) =>
@@ -194,11 +216,11 @@ namespace Kakadoo
             : family == "Vosk" ? Color.FromArgb(156, 106, 222)
             : family == "Llama 2" ? Color.FromArgb(239, 125, 50)
             : Color.FromArgb(0, 168, 160);
-        public static string LlamaFolder => Path.Combine(Root, "llama");
-        public static string VoskFolder => Path.Combine(Root, "vosk-model");
+        public static string LlamaFolder => Path.Combine(ModelsRoot, "llama");
+        public static string VoskFolder => Path.Combine(ModelsRoot, "vosk-model");
 
         /// <summary>The first Vosk model keeps its old folder; the others each get their own.</summary>
-        public static string VoskFolderFor(string id) => id == "vosk-small-en" ? VoskFolder : Path.Combine(Root, "vosk-models", id);
+        public static string VoskFolderFor(string id) => id == "vosk-small-en" ? VoskFolder : Path.Combine(ModelsRoot, "vosk-models", id);
 
         static ModelEntry Vosk(string id, string zip, string lang, string title, long mb, string note, string tip) => new ModelEntry
         {
@@ -207,7 +229,7 @@ namespace Kakadoo
         };
 
         /// <summary>Drop any Whisper-compatible .bin file here and it shows up under Custom models.</summary>
-        public static string CustomFolder => Path.Combine(Root, "custom-models");
+        public static string CustomFolder => Path.Combine(ModelsRoot, "custom-models");
 
         static ModelEntry Whisper(string id, string title, string note, string tip, long mb) => new ModelEntry
         {
@@ -437,6 +459,7 @@ namespace Kakadoo
             Add(WhisperModel.PluginFolder, "*.bin");
             Add(ModelCatalog.CustomFolder, "*.bin");
             Add(ModelCatalog.LlamaFolder, "*.gguf");
+            Add(ModelCatalog.ModelsRoot, "*.gguf");
             Add(ModelCatalog.Folder, "*.gguf");
             Add(WhisperModel.Directory, "*.gguf");
 

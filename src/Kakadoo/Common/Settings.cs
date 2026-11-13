@@ -277,6 +277,18 @@ namespace Kakadoo
                     int i = line.IndexOf('=');
                     if (i > 0) data[line.Substring(0, i).Trim()] = line.Substring(i + 1).Trim();
                 }
+                var moved = ModelCatalog.MigrateOldFolders();
+                if (moved.Count > 0)
+                {
+                    foreach (var key in data.Keys.ToList())
+                        foreach (var m in moved)
+                        {
+                            string v = data[key];
+                            if (v.StartsWith(m.Key + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || v.Equals(m.Key, StringComparison.OrdinalIgnoreCase))
+                                data[key] = m.Value + v.Substring(m.Key.Length);
+                        }
+                    File.WriteAllLines(FilePath, data.Select(kv => kv.Key + "=" + kv.Value));
+                }
             }
             catch (Exception)
             {

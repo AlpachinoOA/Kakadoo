@@ -243,7 +243,7 @@ namespace Kakadoo
 
         /// <summary>Where downloaded models are stored.</summary>
         public static string Directory =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Kakadoo", "models");
+            ModelCatalog.ModelsRoot;
 
         public static string FilePath => Path.Combine(Directory, "ggml-" + Name + ".bin");
 

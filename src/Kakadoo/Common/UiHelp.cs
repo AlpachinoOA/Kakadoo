@@ -36,7 +36,7 @@ namespace Kakadoo
             return e.Message + " (Run the Kakadoo Checker, or the Checker tab in Kakadoo Settings, to find the cause.)";
         }
 
-        static string WhisperModelFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Kakadoo", "models");
+        static string WhisperModelFolder => ModelCatalog.ModelsRoot;
 
         /// <summary>Explains the error, shows it under the component on the canvas, and returns the text for the log.</summary>
         public static string Report(GH_Component owner, Exception e)
