@@ -86,6 +86,8 @@ Optional, and it has no inputs or outputs. Drop one into the document, then righ
   Vosk small), each with a tip on when to pick it, and Llama 2 chat models
   (7B Q2_K, Q4_K_M, Q5_K_M and 13B Q4_K_M from TheBloke on Hugging Face), or point to your own file. **Kakadoo Llama** uses the
   chosen Llama model when its model path input is empty.
+  All downloads are kept in one place, `~/Kakadoo/models` (Windows: `C:\Users\<you>\Kakadoo\models`), with the subfolders `parakeet`,
+  `vosk-model`, `vosk-models`, `llama` and `custom-models`. Folders from older versions are moved there automatically.
 * **Custom models (experimental)**: copy a Whisper-compatible `.bin` file into `~/Kakadoo/models/custom-models` (or add a file from anywhere);
   it is listed here and used by **Kakadoo Custom**.
 * **Checker**: the same checks as the Kakadoo Checker component, run from the window.
@@ -159,7 +161,7 @@ On Mac, allow Rhino to use the microphone when macOS asks.
 |---|---|---|
 | Whisper speech model | Kakadoo, GPT, Llama, Simple, Always-On | Downloaded automatically once to `~/Kakadoo/models` (see below). Manual download: [`ggml-small.en.bin`](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin) (466 MB) or [`ggml-base.en.bin`](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin) (141 MB), from the [whisper.cpp models](https://huggingface.co/ggerganov/whisper.cpp/tree/main). |
 | Llama `.gguf` file | Kakadoo Llama | You provide it. The research used Nous-Hermes-Llama2-13B (Q4_0): [`nous-hermes-llama2-13b.Q4_0.gguf`](https://huggingface.co/TheBloke/Nous-Hermes-Llama2-GGUF/resolve/main/nous-hermes-llama2-13b.Q4_0.gguf) from [TheBloke/Nous-Hermes-Llama2-GGUF](https://huggingface.co/TheBloke/Nous-Hermes-Llama2-GGUF). |
-| Vosk model | Kakadoo Vosk | You provide it, from <https://alphacephei.com/vosk/models>. |
+| Vosk model | Kakadoo Vosk | Download it in Kakadoo Settings > Models, or get one yourself from <https://alphacephei.com/vosk/models>. |
 
 The Whisper model is chosen for your PC: `small.en` (466 MB, most accurate) on a capable PC, `base.en` (141 MB, about
 3x faster) on a modest one. On a development PC, small.en transcribes a short command in about half a second and
